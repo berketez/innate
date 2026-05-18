@@ -96,3 +96,7 @@ CLAUDE.md
 tmp/
 *.tmp
 *.bak
+
+# Tez LaTeX kaynak dosyaları (PDF kalır)
+bitirme2/tez_final/*.tex
+
