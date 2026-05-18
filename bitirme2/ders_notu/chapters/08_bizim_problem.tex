@@ -1,0 +1,481 @@
+% ============================================================
+% Bölüm 8: Bizim Problemimiz -- 3D Mixed Convection
+% ============================================================
+
+\chapter{Bizim Problemimiz: 3D Mixed Convection}
+\label{ch:bizim_problem}
+
+\"Onceki bölümlerde teorik temelleri kurduk: Navier--Stokes denklemleri, Boussinesq yaklaşımı, spektral yöntemler, türbülans ve LES, neural operator kavramları. Şimdi bu bilgilerin tamamını somut bir probleme uyguluyoruz.
+
+Bu bölüm, projenin fiziksel çerçevesini eksiksiz tanımlar: geometri, sınır koşulları, zorlama mekanizması, sıcaklık ayrıştırması, boyutsuz denklemler, parametre uzayı, CFL analizi ve başlangıç koşulları.
+
+
+% ============================================================
+\section{Problem Tanımı ve Geometri}
+\label{sec:problem_tanim}
+
+\subsection{Domain}
+
+Çözüm alanı, üç boyutlu dikdörtgen bir kutudur:
+\begin{equation}
+    \Omega = [0, L_x] \times [0, L_y] \times [0, L_z], \quad
+    L_x = 6, \quad L_y = 10, \quad L_z = 4.
+    \label{eq:domain}
+\end{equation}
+Burada $y$-ekseni dikey (yerçekimi yönü), $x$-ekseni akışın birincil yönü ve $z$-ekseni enine (spanwise) yöndür. Tüm uzunluklar boyutsuzdır; referans uzunluk $H$ alınmıştır.
+
+Domain'in en-boy oranları $L_x : L_y : L_z = 3:5:2$ olarak seçilmiştir. Dikey boyutun ($L_y = 10$) büyük seçilmesinin nedeni: kaldırma kuvveti kaynaklı büyük ölçekli konveksiyon hücrelerinin (plume) yeterli alan bulmasıdır. Yatay boyutlar ($L_x = 6$, $L_z = 4$) ise Kolmogorov forcing'in yeterli sayıda dalga boyunu barındırması ve spanwise yapıların gelişebilmesi için uygundur.
+
+\subsection{Sınır Koşulları}
+
+\textbf{Tüm yönlerde periyodik:}
+\begin{equation}
+    \vect{u}(0, y, z, t) = \vect{u}(L_x, y, z, t), \quad
+    \vect{u}(x, y, 0, t) = \vect{u}(x, y, L_z, t), \quad
+    \vect{u}(x, 0, z, t) = \vect{u}(x, L_y, z, t).
+    \label{eq:periodic_bc}
+\end{equation}
+Bu tamamen periyodik yapı, FFT tabanlı spektral yöntemlerin doğrudan uygulanmasına olanak tanır: türevler, Poisson çözücü ve dealiasing işlemleri Fourier uzayında analitik olarak yapılır.
+
+\textbf{Sıcaklık koşulları:}
+\begin{itemize}
+    \item Alt yüzey ($y = 0$): sıcak, $T = T_{\text{hot}} = 20\,^{\circ}\mathrm{C}$
+    \item Üst yüzey ($y = L_y$): soğuk, $T = T_{\text{cold}} = 0\,^{\circ}\mathrm{C}$
+    \item Sıcaklık farkı: $\Delta T = T_{\text{hot}} - T_{\text{cold}} = 20\,^{\circ}\mathrm{C}$
+\end{itemize}
+Bu sıcaklık koşulu, Rayleigh--B\'{e}nard konveksiyonunun sürücüsüdür. Alttaki sıcak akışkan hafifleyerek yükselir, üstteki soğuk akışkan ağırlaşarak alçalır; bu dengesizlik konvektif hücrelere yol açar.
+
+\begin{remark}
+Alt sıcak, üst soğuk koşulu ile periyodik sınır koşulu arasında ciddi bir çelişki vardır. Bu çelişki ve çözümü Bölüm~\ref{sec:sicaklik_ayristirma}'da ele alınmaktadır.
+\end{remark}
+
+\subsection{Fiziksel Senaryo}
+
+Bu problem, aşağıdaki gerçekçi senaryoları modeller:
+\begin{itemize}
+    \item \textbf{Dikey atrium:} Çok katlı bir binanın ortasındaki açık hacim. Taban ısıtılmış (yer ısıtma), tavan soğuk; aynı zamanda kapı/pencere açıklıklarından yatay rüzgâr girer.
+    \item \textbf{Açık alan:} Güneş'ten ısınan zemin üzerinde, yatay rüzgârın etkisi altında oluşan atmosferik sınır tabaka.
+    \item \textbf{Bina aralarındaki rüzgâr koridoru:} Binalar arasında kanallanmış rüzgâr ve zeminle bina yüzeyleri arasındaki sıcaklık farkının örneği.
+\end{itemize}
+
+%\begin{figure}[H]
+%    \centering
+%    \includegraphics[width=0.85\textwidth]{problem_geometry.png}
+%    \caption{3D mixed convection domain geometrisi. $L_x \times L_y \times L_z = 6 \times 10 \times 4$ boyutlu periyodik kutu. Alt yüzey sıcak ($T_{\text{hot}}$), üst yüzey soğuk ($T_{\text{cold}}$). Yatay ok, Kolmogorov forcing'in yönünü gösterir.}
+%    \label{fig:problem_geometry}
+%\end{figure}
+
+
+% ============================================================
+\section{Kolmogorov Forcing}
+\label{sec:kolmogorov_forcing}
+
+\subsection{Formülasyon}
+
+Hız alanına uygulanan dış kütle kuvveti (body forcing):
+\begin{equation}
+    \vect{F}(y) = A \sin\!\left(\frac{k_f \cdot 2\pi y}{L_y}\right) \hat{\vect{e}}_x
+    \label{eq:kolmogorov_forcing}
+\end{equation}
+\begin{itemize}
+    \item $A$: genlik (öğrenilebilir parametre, INNATE'te)
+    \item $k_f = 1$: zorlama dalga sayısı (tek mod)
+    \item $\hat{\vect{e}}_x$: kuvvet $x$-yönündedir
+    \item Kuvvet yalnızca $y$'ye bağlıdır: dikey konuma göre farklı şiddette rüzgâr
+\end{itemize}
+
+$k_f = 1$ seçimi, domain içinde tek bir sinüs dalgası anlımına gelir: $y = L_y/4$'te kuvvet pozitif ($+x$), $y = 3L_y/4$'te negatif ($-x$). Bu da bir kesme (shear) akışı yaratır.
+
+\subsection{Neden Kolmogorov Forcing?}
+
+Kolmogorov akışı (Kolmogorov flow), türbülans araştırmalarında standart bir benchmark'tir. Seçim nedenleri:
+
+\begin{enumerate}
+    \item \textbf{Analitik laminer çözüm:} Düşük $\Rey$ değerlerinde, karılı durum çözümü:
+    \begin{equation}
+        u_{\text{laminar}}(y) = \frac{A \, \Rey}{(k_f \cdot 2\pi / L_y)^2} \sin\!\left(\frac{k_f \cdot 2\pi y}{L_y}\right)
+        \label{eq:kolmogorov_laminar}
+    \end{equation}
+    Bu analitik çözüm, kodun doğrulanması için vazgeçilmezdir.
+
+    \item \textbf{Periyodik yapıya uyum:} Forcing fonksiyonu doğal olarak periyodiktir, FFT ile tam uyum içindedir.
+
+    \item \textbf{Akademik standart:} Kolmogorov-type forcing, $\Rey$ aşıldığında türbülansa geçişi temiz biçimde üretir. Energy injection rate iyi tanımlıdır: $\varepsilon_{\text{input}} = \langle \vect{u} \cdot \vect{F} \rangle$.
+
+    \item \textbf{Kontrol edilebilir rejim:} $A$ ayarlanarak, zorlanmış konveksiyon şiddeti sürekli değiştirilebilir.
+\end{enumerate}
+
+\subsection{Stochastic Mod: Ornstein--Uhlenbeck Süreci}
+
+Gerçek rüzgâr sabit değildir; zamanla dalgalanır. Bu davranışı modellemek için genlik $A(t)$ bir Ornstein--Uhlenbeck (OU) sürecine bağlanır:
+\begin{equation}
+    dA = -\frac{A - A_0}{\tau_{\text{OU}}} \, dt + \sigma_{\text{OU}} \, dW(t)
+    \label{eq:ou_process}
+\end{equation}
+\begin{itemize}
+    \item $A_0$: ortalama genlik (mean reversion hedefi)
+    \item $\tau_{\text{OU}}$: korelasyon zamanı (büyük $\to$ yavaş değişim)
+    \item $\sigma_{\text{OU}}$: dalgalanma şiddeti
+    \item $dW(t)$: Wiener süreci (Brownian motion)
+\end{itemize}
+OU süreci, sıfıra değil $A_0$'a dönme eğilimindedir; dolayısıyla rüzgâr hiçbir zaman ``ölmez'' ama gerçekçi şekilde dalgalanır. $k_f = 1$ seçimi ile bu mod, büyük ölçekli atmosferik rüzgâr dalgalanmasının basit bir surrogat'ıdır.
+
+%\begin{figure}[H]
+%    \centering
+%    \includegraphics[width=0.80\textwidth]{kolmogorov_forcing.png}
+%    \caption{Kolmogorov forcing profili. Sol: $F_x(y) = A\sin(2\pi y / L_y)$. Sağ: Stochastic modda genlik $A(t)$'nin OU süreci ile zamansal evrimi.}
+%    \label{fig:kolmogorov_forcing}
+%\end{figure}
+
+
+% ============================================================
+\section{Sıcaklık Ayrıştırması}
+\label{sec:sicaklik_ayristirma}
+
+Bu kısım, projenin teknik olarak en kritik noktalarından biridir. Periyodik sınır koşulları ile inhomogen sıcaklık koşulunu bağdaştırmak için sıcaklık alanının \textit{ayrıştırılması} gerekir.
+
+\subsection{Sorun: Periyodik BC ile Sıcaklık Çelişkisi}
+
+Periyodik sınır koşulu, $y$-yönünde şunu zorunlu kılar:
+\begin{equation}
+    T(x, 0, z, t) = T(x, L_y, z, t).
+    \label{eq:periodic_T}
+\end{equation}
+Ancak fiziksel problemde:
+\begin{equation}
+    T(x, 0, z, t) = T_{\text{hot}} = 20\,^{\circ}\mathrm{C}, \quad
+    T(x, L_y, z, t) = T_{\text{cold}} = 0\,^{\circ}\mathrm{C}.
+\end{equation}
+Bu iki koşul aynı anda sağlanamaz. Eğer $T$ doğrudan FFT'ye sokulursa, periyodiklik varsayımı ihlal edilir ve Gibbs fenomeni (süreksizlikteki salınım) bütün çözümü bozar.
+
+\subsection{Çözüm: Baz Profil + Pertürbasyon}
+
+Sıcaklık alanı iki parçaya ayrılır:
+\begin{equation}
+    \boxed{T(x, y, z, t) = T_{\text{base}}(y) + T'(x, y, z, t)}
+    \label{eq:T_decomposition}
+\end{equation}
+
+\textbf{Baz profil} (sabit, çözüm boyunca değişmez):
+\begin{equation}
+    T_{\text{base}}(y) = T_{\text{hot}} - \frac{\Delta T}{L_y} \, y
+    \label{eq:T_base}
+\end{equation}
+Bu, alt sıcak -- üst soğuk koşulunu sağlayan lineer profildir. Fiziksel olarak, konveksiyon yokken (tamamen difuzif rejim), sıcaklık alanının yaklaşacağı denge profilidir.
+
+\textbf{Pertürbasyon} (zamanla evrilen, modelin çözdüğü büyüklük):
+\begin{equation}
+    T'(x, y, z, t) = T(x, y, z, t) - T_{\text{base}}(y)
+    \label{eq:T_perturbation}
+\end{equation}
+$T'$ \textit{periyodiktir}:
+\[
+    T'(x, 0, z, t) = T(x, 0, z, t) - T_{\text{hot}} = 0, \quad
+    T'(x, L_y, z, t) = T(x, L_y, z, t) - T_{\text{cold}} = 0.
+\]
+Dolayısıyla $T'(x, 0, z, t) = T'(x, L_y, z, t) = 0$ olup periyodiklik koşulu doğal olarak sağlanır. FFT sorunsuz uygulanabilir.
+
+\subsection{Enerji Denklemine Etkisi}
+
+Orijinal enerji denklemi (Boussinesq, boyutsuz):
+\begin{equation}
+    \pd{T}{t} + (\vect{u} \cdot \gradient) T = \frac{1}{\Rey \, \Pran} \laplacian T.
+    \label{eq:energy_original}
+\end{equation}
+$T = T_{\text{base}}(y) + T'$ yerlerine koyulduğunda:
+\begin{align}
+    \pd{T'}{t} + (\vect{u} \cdot \gradient)(T_{\text{base}} + T')
+    &= \frac{1}{\Rey \, \Pran} \laplacian (T_{\text{base}} + T') \notag \\
+    \pd{T'}{t} + (\vect{u} \cdot \gradient) T_{\text{base}} + (\vect{u} \cdot \gradient) T'
+    &= \frac{1}{\Rey \, \Pran} \left[ \underbrace{\laplacian T_{\text{base}}}_{=0 \text{ (lineer profil)}} + \laplacian T' \right]. \notag
+\end{align}
+$T_{\text{base}}(y)$ lineer olduğundan $\laplacian T_{\text{base}} = 0$. Adveksiyon terimi ise:
+\begin{equation}
+    (\vect{u} \cdot \gradient) T_{\text{base}}
+    = u \underbrace{\pd{T_{\text{base}}}{x}}_{=0}
+    + v \pd{T_{\text{base}}}{y}
+    + w \underbrace{\pd{T_{\text{base}}}{z}}_{=0}
+    = v \cdot \left(-\frac{\Delta T}{L_y}\right)
+    = -\frac{v \, \Delta T}{L_y}.
+\end{equation}
+Sonuç olarak, $T'$ için evrim denklemi:
+\begin{equation}
+    \boxed{
+        \pd{T'}{t} + (\vect{u} \cdot \gradient) T'
+        = \frac{1}{\Rey \, \Pran} \laplacian T'
+        + \frac{v \, \Delta T}{L_y}
+    }
+    \label{eq:T_prime_equation}
+\end{equation}
+
+Sağ taraftaki son terim, $v \cdot \Delta T / L_y$, bir \textbf{kaynak terimdir}. Fiziksel anlamı: dikey hız $v > 0$ (yukarı akış) olduğunda, sıcak akışkan lineer profilden daha sıcak bir bölgeye taşınır $\to$ pozitif $T'$ üretilir. Bu, kaldırma kuvveti ile sıcaklık alanının kenetlenmesini (coupling) sağlar.
+
+\subsection{Pratikte Uygulama}
+
+\begin{enumerate}
+    \item \textbf{State değişkeni:} Model yalnızca $T'$'yi tutar ve evrimini hesaplar. $T_{\text{base}}(y)$ sabit olduğundan state'te yer almaz.
+
+    \item \textbf{Gauge fix (drift önleme):} Her zaman adımından sonra:
+    \begin{equation}
+        T' \leftarrow T' - \langle T' \rangle
+        \label{eq:gauge_fix}
+    \end{equation}
+    Burada $\langle \cdot \rangle$ hacim ortalamasıdır. Neden? Periyodik domain'de ortalama sıcaklıkın zaman içinde kayması (numerical drift), sayısal hatalarda birikerek fiziksel olmayan sonuçlara yol açabilir. Bu düzeltme, $T'$'nin sıfır ortalamada kalmasını garanti eder.
+
+    \item \textbf{Toplam sıcaklık:} Diagnostik amaçlı (Nusselt hesabı, görselleştirme):
+    \begin{equation}
+        T_{\text{total}}(x, y, z, t) = T_{\text{base}}(y) + T'(x, y, z, t).
+    \end{equation}
+\end{enumerate}
+
+%\begin{figure}[H]
+%    \centering
+%    \includegraphics[width=0.90\textwidth]{temperature_decomposition.png}
+%    \caption{Sıcaklık ayrıştırması. Sol: $T_{\text{base}}(y)$ lineer profil. Orta: $T'$ pertürbasyon (periyodik, FFT uyumlu). Sağ: $T_{\text{total}} = T_{\text{base}} + T'$.}
+%    \label{fig:temperature_decomposition}
+%\end{figure}
+
+
+% ============================================================
+\section{Boyutsuz Denklem Sistemi}
+\label{sec:bizim_denklemler}
+
+Proje, Boussinesq yaklaşımı altında çalışır (bkz.~Bölüm~\ref{ch:boussinesq}). Boyutsuz değişkenler ile denklem sistemi:
+
+\subsection{Momentum Denklemi}
+\begin{equation}
+    \boxed{
+        \pd{\vect{u}}{t} + (\vect{u} \cdot \gradient)\vect{u}
+        = -\gradient p
+        + \frac{1}{\Rey} \laplacian \vect{u}
+        + \Rich \, T' \, \hat{\vect{e}}_y
+        + \vect{F}
+    }
+    \label{eq:momentum_bizim}
+\end{equation}
+
+Terimlerin fiziksel anlamları:
+\begin{itemize}
+    \item $(\vect{u} \cdot \gradient)\vect{u}$: Adveksiyon --- akışkanın kendini taşıması (nonlineer terim).
+    \item $-\gradient p$: Basınç gradyanı --- kütlenin korunumunu zorlar ($\divergence \vect{u} = 0$).
+    \item $\frac{1}{\Rey} \laplacian \vect{u}$: Visköz difüzyon --- kinetik enerjiyi ısıya çevirir.
+    \item $\Rich \, T' \, \hat{\vect{e}}_y$: Kaldırma kuvveti --- sıcaklık pertürbasyonundan kaynaklanan dikey kuvvet.
+    \item $\vect{F}$: Dış zorlama (Kolmogorov forcing, (\ref{eq:kolmogorov_forcing})).
+\end{itemize}
+
+\subsection{Sıcaklık Pertürbasyon Denklemi}
+\begin{equation}
+    \boxed{
+        \pd{T'}{t} + (\vect{u} \cdot \gradient)T'
+        = \frac{1}{\Rey \, \Pran} \laplacian T'
+        + v \, \frac{\Delta T}{L_y}
+    }
+    \label{eq:temperature_bizim}
+\end{equation}
+Son terim, Bölüm~\ref{sec:sicaklik_ayristirma}'daki türetimden gelen kaynak terimidir.
+
+\subsection{Süreklilik Denklemi}
+\begin{equation}
+    \boxed{\divergence \vect{u} = 0}
+    \label{eq:continuity_bizim}
+\end{equation}
+Boussinesq yaklaşımında hız alanı solenoidaldir. Bu koşul, her zaman adımında Projection nöronu tarafından sağlanır.
+
+\subsection{Bileşen Formu}
+
+Açık bileşen yazımı (hesaplama implementasyonu için):
+\begin{align}
+    \pd{u}{t} + u\pd{u}{x} + v\pd{u}{y} + w\pd{u}{z}
+    &= -\pd{p}{x} + \frac{1}{\Rey}\left(\pdd{u}{x} + \pdd{u}{y} + \pdd{u}{z}\right) + F_x
+    \label{eq:u_component} \\[6pt]
+    \pd{v}{t} + u\pd{v}{x} + v\pd{v}{y} + w\pd{v}{z}
+    &= -\pd{p}{y} + \frac{1}{\Rey}\left(\pdd{v}{x} + \pdd{v}{y} + \pdd{v}{z}\right) + \Rich \, T'
+    \label{eq:v_component} \\[6pt]
+    \pd{w}{t} + u\pd{w}{x} + v\pd{w}{y} + w\pd{w}{z}
+    &= -\pd{p}{z} + \frac{1}{\Rey}\left(\pdd{w}{x} + \pdd{w}{y} + \pdd{w}{z}\right)
+    \label{eq:w_component} \\[6pt]
+    \pd{T'}{t} + u\pd{T'}{x} + v\pd{T'}{y} + w\pd{T'}{z}
+    &= \frac{1}{\Rey \, \Pran}\left(\pdd{T'}{x} + \pdd{T'}{y} + \pdd{T'}{z}\right) + \frac{v \, \Delta T}{L_y}
+    \label{eq:Tprime_component}
+\end{align}
+Önemli: Kaldırma kuvveti terimi \textit{yalnızca} $v$-denkleminde (dikey momentum) görülür; $u$ ve $w$ denklemlerinde yer almaz. Benzer şekilde, Kolmogorov forcing ($F_x$) yalnızca $u$-denklemindedir.
+
+
+% ============================================================
+\section{Boyutsuz Sayılar ve Parametre Uzayı}
+\label{sec:parametre_uzayi}
+
+\subsection{Boyutsuz Sayıların Tanımı}
+
+\begin{table}[H]
+\centering
+\caption{Projede kullanılan boyutsuz sayılar.}
+\label{tab:boyutsuz_sayilar}
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Sayı} & \textbf{Tanım} & \textbf{Değer Aralığı} & \textbf{Fiziksel Anlam} \\
+\midrule
+$\Rey$ & $UL/\nu$ & $5\,000$--$10\,000$ & Atalet / viskozite oranı \\
+$\Ray$ & $g\beta\Delta T L^3 / (\nu\kappa)$ & $10^5$--$10^7$ & Kaldırma / difuzyon oranı \\
+$\Pran$ & $\nu / \kappa$ & $0.71$ & Momentum / ısı difuzyon oranı (hava) \\
+$\Rich$ & $\Ray / (\Rey^2 \Pran)$ & (hesaplanır) & Kaldırma / atalet oranı \\
+$\Nus$ & $1 + \langle v T' \rangle \big/ \left(\kappa \frac{\Delta T}{L_y}\right)$ & $\geq 1$ & Toplam / difuzif ısı oranı \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Richardson sayısı akış rejimini belirleyen anahtar parametredir:
+\begin{equation}
+    \Rich = \frac{\Ray}{\Rey^2 \, \Pran}
+    \label{eq:Ri_definition}
+\end{equation}
+
+\subsection{Richardson Sayısı Tablosu}
+
+\begin{table}[H]
+\centering
+\caption{$\Rich$ değerleri, $\Rey$ ve $\Ray$ kombinasyonları için ($\Pran = 0.71$).}
+\label{tab:Ri_values}
+\begin{tabular}{@{}l|ccc@{}}
+\toprule
+$\Rey \backslash \Ray$ & $10^5$ & $10^6$ & $10^7$ \\
+\midrule
+$5\,000$   & $0.0056$   & $0.056$   & $0.56$     \\
+$7\,000$   & $0.0029$   & $0.029$   & $0.29$     \\
+$10\,000$  & $0.0014$   & $0.014$   & $0.14$     \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Rejim Analizi}
+
+\begin{itemize}
+    \item $\Rich \ll 1$: \textbf{Rüzgâr baskın} (forced convection rejimi). Kolmogorov forcing, kaldırma kuvvetinden çok daha güçlü; sıcaklık pasif skaler gibi taşınır. Bu projede $\Rey = 10\,000$, $\Ray = 10^5$ ile $\Rich \approx 0.0014$: neredeyse tamamen zorlanmış konveksiyon.
+
+    \item $\Rich \sim \mathcal{O}(0.1\text{--}1)$: \textbf{Mixed convection} (karışık rejim). Rüzgâr ve kaldırma kuvveti karşılaştırılabilir büyüklükte; en karmaşık fizik. Tilted plume'lar, eğik konveksiyon hücreleri görülür. Bu projede $\Rey = 5\,000$, $\Ray = 10^7$ ile $\Rich \approx 0.56$: mixed convection rejimi.
+
+    \item $\Rich \gg 1$: \textbf{Kaldırma baskın} (natural convection rejimi). Sıcaklık farkı akışı domine eder; rüzgâr küçük bir pertürbasyondur. \textit{Bu projede seçilen parametre aralığında $\Rich > 1$ elde edilemiyor; en yüksek değer $\Rich \approx 0.56$.}
+\end{itemize}
+
+Tablodaki değerlere bakarsak, seçilen parametre uzayının $\Rich \sim 0.001$'den $\Rich \sim 0.56$'ya kadar uzandığını görürüz. Bu, zorlanmış konveksiyondan mixed konveksiyona geçişi kapsayan bir aralıktır. Kaldırma baskın rejim ($\Rich \gg 1$) için daha yüksek $\Ray$ veya daha düşük $\Rey$ değerleri gerekir.
+
+
+% ============================================================
+\section{CFL Koşulu ve Zaman Adımı}
+\label{sec:cfl}
+
+\subsection{CFL Koşulu}
+
+Courant--Friedrichs--Lewy (CFL) koşulu, açık zaman integrasyon yöntemlerinin kararlılığı için gereklidir:
+\begin{equation}
+    \mathrm{CFL} = |\vect{u}|_{\max} \cdot \frac{\Delta t}{\Delta x_{\min}} < 1
+    \label{eq:cfl}
+\end{equation}
+Üç boyutlu durumda:
+\begin{equation}
+    \mathrm{CFL} = \Delta t \left(\frac{|u|_{\max}}{\Delta x} + \frac{|v|_{\max}}{\Delta y} + \frac{|w|_{\max}}{\Delta z}\right) < 1.
+    \label{eq:cfl_3d}
+\end{equation}
+
+Fiziksel anlam: bir zaman adımında bilgi, en fazla bir grid hücresi kadar ilerleyebilir. Bu koşul ihlal edilirse, sayısal şema dengesiz dalga modlarını üretir ve çözüm patlar.
+
+\subsection{Grid Boyutları}
+
+INNATE grid: $N_x \times N_y \times N_z = 96 \times 160 \times 64$.
+\begin{equation}
+    \Delta x = \frac{L_x}{N_x} = \frac{6}{96} = 0.0625, \quad
+    \Delta y = \frac{L_y}{N_y} = \frac{10}{160} = 0.0625, \quad
+    \Delta z = \frac{L_z}{N_z} = \frac{4}{64} = 0.0625.
+    \label{eq:grid_spacing}
+\end{equation}
+Her üç yönde eşit grid aralığı ($\Delta x = \Delta y = \Delta z = 0.0625$) elde edilir. Bu izotropik grid, spektral yöntemler için idealdir.
+
+DNS grid: $N_x \times N_y \times N_z = 192 \times 320 \times 128$. Grid aralığı: $\Delta x_{\text{DNS}} = 0.03125$.
+
+\subsection{Zaman Adımı Analizi}
+
+Seçilen zaman adımı: $\Delta t = 0.005$.
+
+\textbf{Konvektif CFL:} Tipik türbülant hız $|\vect{u}|_{\max} \sim 3$ varsayımı ile:
+\begin{equation}
+    \mathrm{CFL}_{\text{conv}} = 3 \times \frac{0.005}{0.0625} = 0.24 \quad (\text{güvenli}).
+    \label{eq:cfl_check}
+\end{equation}
+
+\textbf{Difüzif CFL:} 3B'de altı komşu nokta olduğundan:
+\begin{equation}
+    \Delta t < \frac{\Delta x^2}{6\nu} = \frac{0.0625^2}{6 / \Rey}
+    \label{eq:diffusive_cfl}
+\end{equation}
+$\Rey = 5000$ ($\nu = 2 \times 10^{-4}$) için:
+\[
+    \Delta t < \frac{3.906 \times 10^{-3}}{1.2 \times 10^{-3}} \approx 3.26.
+\]
+Difüzif kararlılık sınırı çok rahat sağlanır ($\Delta t = 0.005 \ll 3.26$). Bu beklenendir: yüksek $\Rey$'de konvektif CFL kısıtlayıcıdır, difüzif değil.
+
+
+% ============================================================
+\section{Başlangıç Koşulları}
+\label{sec:baslangic}
+
+Simülasyon aşağıdaki başlangıç koşulları ile başlatılır:
+
+\subsection{Hız Alanı}
+\begin{equation}
+    u(x, y, z, 0) = \epsilon_u \cdot \eta_u(x, y, z), \quad
+    v(x, y, z, 0) = \epsilon_v \cdot \eta_v(x, y, z), \quad
+    w(x, y, z, 0) = \epsilon_w \cdot \eta_w(x, y, z)
+    \label{eq:ic_velocity}
+\end{equation}
+Burada $\eta_u, \eta_v, \eta_w \sim \mathcal{N}(0, 1)$ standart normal dağılımlı rastgele alanlar ve $\epsilon \sim 0.01$ küçük bir genlik faktörüdür.
+
+\textbf{Neden küçük pertürbasyon?} Sıfır hız alanı ($\vect{u} = \vect{0}$) bir denge durumudur, ancak \textit{kararsız} bir dengedir (yüksek $\Rey$ ve $\Ray$ için). Küçük pertürbasyon, doğal instabiliteleri tetikler ve simülasyonun gerçekçi türbülant duruma geçmesini sağlar.
+
+\begin{remark}
+Başlangıç pertürbasyonu sonrası Projection uygulanarak $\divergence \vect{u} = 0$ sağlanır. Rastgele alan dolaylı olarak divergence-free değildir; Projection bu hatayı düzeltir.
+\end{remark}
+
+\subsection{Sıcaklık Alanı}
+\begin{equation}
+    T'(x, y, z, 0) = \epsilon_T \cdot \eta_T(x, y, z), \quad \epsilon_T \sim 0.01
+    \label{eq:ic_temperature}
+\end{equation}
+Toplam sıcaklık: $T(x, y, z, 0) = T_{\text{base}}(y) + T'(x, y, z, 0)$.
+
+\subsection{Basınç Alanı}
+\begin{equation}
+    p(x, y, z, 0) = 0.
+    \label{eq:ic_pressure}
+\end{equation}
+Basınçın sıfırdan başlaması sorun oluşturmaz: Projection nöronu her adımda basıncı $\divergence \vect{u} = 0$'ı sağlayacak şekilde yeniden hesaplar. Başlangıç değeri ilk adımda düzeltilir.
+
+\subsection{Spin-Up Dönemi}
+
+Başlangıç koşullarından istatistiksel kararlı duruma ulaşmak için bir ``spin-up'' dönemi gereklidir. Bu dönemde:
+\begin{enumerate}
+    \item Kolmogorov forcing, ortalama akışı kurar.
+    \item Sıcaklık farkı, konvektif hücreleri geliştirir.
+    \item Enerji kaskadı oluşur: büyük ölçeklerden küçük ölçeklere enerji akar.
+    \item \"{I}statistiksel denge kurulur: enerji üretimi $\approx$ dissipasyon.
+\end{enumerate}
+Spin-up süresi probleme bağlıdır; tipik olarak $t_{\text{spin-up}} \sim 10$--$50$ büyük ölçek zaman birimi ($L_y / U$).
+
+
+% ============================================================
+\section{Bölüm Özeti}
+\label{sec:problem_ozet}
+
+Bu bölümde tanımlanan problem:
+
+\begin{itemize}
+    \item $6 \times 10 \times 4$ boyutlu, üç yönde periyodik kutu.
+    \item Alt sıcak ($20\,^{\circ}\mathrm{C}$), üst soğuk ($0\,^{\circ}\mathrm{C}$) $\to$ kaldırma kuvveti.
+    \item Kolmogorov forcing $\to$ yatay rüzgâr etkisi.
+    \item Sıcaklık ayrıştırması: $T = T_{\text{base}} + T'$ ile periyodik BC uyumu.
+    \item 4 alan değişkeni: $u, v, w, T'$ (basınç Projection ile hesaplanır).
+    \item 3 kontrol parametresi: $\Rey \in [5000, 10000]$, $\Ray \in [10^5, 10^7]$, $\Pran = 0.71$.
+    \item Grid: $96 \times 160 \times 64$ (INNATE), $192 \times 320 \times 128$ (DNS).
+    \item $\Delta t = 0.005$, $\mathrm{CFL} \approx 0.24$.
+\end{itemize}
+
+Sonraki bölümde (Bölüm~\ref{ch:innate_mimari}), bu denklemlerin her teriminin nasıl bir INNATE nöronuna dönüştüğünü ve ağ yapısını göreceğiz.

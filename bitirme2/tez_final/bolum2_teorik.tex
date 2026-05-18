@@ -1,0 +1,141 @@
+% ============================================================
+% BÖLÜM 2 - TEORİK VE YÖNTEMSEL TEMELLER
+% ============================================================
+\chapter{TEORİK VE YÖNTEMSEL TEMELLER}
+\label{ch:teorik}
+
+\section{Sıkıştırılamaz Navier--Stokes Denklemleri}
+
+Bu çalışmada akışkan, sıkıştırılamaz ve Newtonyen kabul edilmiştir. Çözüm alanı $\Omega = [0,L_{x}]\times[0,L_{y}]\times[0,L_{z}]$ üç boyutlu periyodik küp benzeri bir bölge, dikey eksen $y$ yönündedir (somut değerler $L_{x}=6$, $L_{y}=10$, $L_{z}=4$ ile birlikte Bölüm~\ref{ch:mimari}'de verilmiştir). Çözüm değişkenleri hız vektörü $\mathbf{u}(\mathbf{x},t)=(u,v,w)$ (sırasıyla $x$, $y$, $z$ yönlerinde), basınç $p(\mathbf{x},t)$ ve sıcaklık dalgalanması $\theta(\mathbf{x},t)$'dir. Boyutsuzlaştırılmış momentum, süreklilik ve enerji denklemleri sırasıyla şu biçimde yazılır:
+\begin{align}
+\frac{\partial \mathbf{u}}{\partial t} + (\mathbf{u}\cdot\nabla)\mathbf{u}
+&= -\nabla p + \frac{1}{\mathrm{Re}}\,\nabla^{2}\mathbf{u} + \mathbf{f}_{B}(\theta) + \mathbf{f}_{F}, \label{eq:ns_mom} \\
+\nabla \cdot \mathbf{u} &= 0, \label{eq:ns_cont} \\
+\frac{\partial \theta}{\partial t} + (\mathbf{u}\cdot\nabla)\theta
+&= \frac{1}{\mathrm{Re}\,\mathrm{Pr}}\,\nabla^{2}\theta + S_{\theta}, \label{eq:ns_energy}
+\end{align}
+burada $\mathrm{Re}=UL/\nu$ Reynolds sayısı, $\mathrm{Pr}=\nu/\alpha$ Prandtl sayısı, $\mathbf{f}_{B}(\theta)$ Boussinesq kaldırma kuvveti terimi, $\mathbf{f}_{F}$ büyük ölçekleri yenileyen dış zorlama terimi ve $S_{\theta}$ termal dalgalanmayı koruyan sıcaklık kaynak terimidir. Sınır koşulları periyodiktir, başlangıç koşulları ise Bölüm~\ref{ch:bulgular}'da belirtilen kontrollü pertürbasyon ile verilmiştir.
+
+\section{Boussinesq Yaklaşımı ve Karışık Konveksiyon}
+
+Yoğunluk değişimleri yalnızca kaldırma kuvveti terimi içinde dikkate alınmıştır. Bu yaklaşım, sıcaklık farklarının görece küçük olduğu ve akustik etkilerin ihmal edilebildiği rejimler için literatürde standart olarak kabul edilir \cite{tritton_physical_1988, bejan_convection_2013}. Kaldırma kuvveti terimi, dikey eksen $y$ konvansiyonuna göre,
+\begin{equation}
+\mathbf{f}_{B}(\theta) = \frac{\mathrm{Ra}}{\mathrm{Re}^{2}\,\mathrm{Pr}}\,\theta\,\hat{\mathbf{e}}_{y}
+= \mathrm{Ri}\,\theta\,\hat{\mathbf{e}}_{y},
+\label{eq:buoyancy}
+\end{equation}
+biçimindedir; burada $\hat{\mathbf{e}}_{y}$ dikey birim vektörüdür ve $\theta>0$ (sıcak akışkan) için kaldırma kuvveti yukarı doğrudur. $\mathrm{Ra}=g\beta\Delta T L^{3}/(\nu\alpha)$ Rayleigh sayısı ve $\mathrm{Ri}=\mathrm{Ra}/(\mathrm{Re}^{2}\mathrm{Pr})$ Richardson sayısıdır. Bu çalışmada $\mathrm{Re}=10\,000$, $\mathrm{Ra}=10^{5}$, $\mathrm{Pr}=0.71$ alındığında Richardson sayısı $\mathrm{Ri}\approx 1.4\times 10^{-3}$ ile zayıf-kaldırmalı bir karışık konveksiyon rejimine karşılık gelir. Bu rejim seçimi, ön testlerde gözlenen kaldırma kuvveti kaynaklı sayısal kararsızlıkları (özellikle $\mathrm{Ri}\sim\mathcal{O}(1)$ rejimlerinde) önlemek ve aynı zamanda termal alanın akış üzerinde gözlemlenebilir bir etkisinin korunmasını sağlamak amacıyla bilinçli olarak yapılmıştır.
+
+Karışık konveksiyon problemi, klasik zorlanmış konveksiyon (yalnızca atalet) veya doğal konveksiyon (yalnızca kaldırma) problemlerine kıyasla daha zengindir; zira denklem~\eqref{eq:ns_mom}, denklem~\eqref{eq:ns_energy} ile $\mathbf{u}\leftrightarrow\theta$ üzerinden çift yönlü bir bağlantı (\textit{two-way coupling}) içerir. Bu bağlantı, sıcaklık alanının kendisinin bir taşınım denklemi ile yönetildiği, ancak aynı zamanda hız alanını da etkilediği anlamına gelir; dolayısıyla doğru bir sayısal çözüm her iki alanın da fiziksel olarak tutarlı şekilde temsil edilmesini gerektirir.
+
+Bu çalışmada ele alınan karışık konveksiyon konfigürasyonu, klasik literatürdeki iki temel akış kategorisinin bir arada bulunmasıyla tanımlanır:
+
+\paragraph{Rayleigh--B\'enard konveksiyonu.} Sıkıştırılamaz akışkanın alttan ısıtılıp üstten soğutulduğu, dolayısıyla negatif sıcaklık gradyanına sahip bir kararsız termal katmanlanma altında, kaldırma kuvveti kaynaklı konvektif hücrelerin oluştuğu klasik problem \cite{tritton_physical_1988, bejan_convection_2013}. Bu çalışmadaki termal yapı (alt sınırda $T_{\mathrm{hot}}$, üst sınırda $T_{\mathrm{cold}}$, Boussinesq kaldırma terimi $\mathrm{Ri}\,\theta\,\hat{\mathbf{e}}_{y}$) doğrudan Rayleigh--B\'enard problemine eşdeğerdir; ancak periyodik sınır koşulları nedeniyle duvar etkileri yer almaz.
+
+\paragraph{Kolmogorov zorlaması.} Tek modlu, sinüsoidal, sabit-amplitüdlü mekanik zorlama; akışı büyük ölçeklerden besler ve enerji-kaskat sürecini sürekli yenilemek için kullanılır. Tek bir dalga sayısı $k_{f}$ üzerine yoğunlaşan bu zorlama, periyodik kutu içinde dört adet karşıt-dönen büyük girdap üretir ve homojen-izotropik türbülans çalışmalarında standart bir referans zorlamasıdır.
+
+Söz konusu konfigürasyonun yenisi, bu iki klasik mekanizmanın aynı akış alanında \emph{birlikte} çözülmesidir: mekanik zorlama sürekli enerji girişini sağlarken, termal kaldırma akış dinamiğine ek bir kuvvet ekler. ``Karışık konveksiyon'' terimi bu birlikte-aktif konfigürasyon için kullanılmaktadır; literatürde Richardson sayısı rejimine göre yapılan ($\mathrm{Ri}\sim\mathcal{O}(1)$) sıkı sınıflandırma ile karıştırılmamalıdır. Bu çalışmadaki çalışma noktası $\mathrm{Ri}\approx 10^{-3}$ ile zorlanmış konveksiyon baskın bir uç noktayı temsil eder; bu seçim, termal alanın akış üzerinde gözlemlenebilir bir etkisinin korunması ile sayısal kararsızlık yaratacak ölçüde güçlü kaldırma kuvvetinden kaçınma arasındaki bilinçli bir dengedir.
+
+\section{Türbülans İstatistikleri ve Doğrulama Metrikleri}
+
+Türbülanslı bir akış alanının nicelik açısından doğrulanması için zaman ortalamalı istatistikler kullanılır. Bu çalışmada başlıca üç metrik kullanılmıştır.
+
+\paragraph{Türbülans kinetik enerjisi (TKE).} Hız alanının ortalama dalgalanma enerjisidir:
+\begin{equation}
+\mathrm{TKE} = \tfrac{1}{2}\,\langle u_{i}'\,u_{i}'\rangle,
+\qquad u_{i}'(\mathbf{x},t)=u_{i}(\mathbf{x},t)-\overline{u_{i}}(\mathbf{x}),
+\label{eq:tke}
+\end{equation}
+burada $\overline{(\cdot)}$ uzun-zaman ortalaması, $\langle\cdot\rangle$ uzaysal ortalamayı gösterir. TKE, akışın türbülans şiddetinin temel niceliksel göstergesidir.
+
+\paragraph{Nusselt sayısı.} Akıştaki ısı transferinin saf iletime kıyasla ne kadar yoğunlaştığını ölçer. Bu çalışmada dikey eksen $y$ yönünde olduğundan, konvektif ısı akısı dikey hız bileşeni $v$ ile sıcaklık dalgalanması $\theta$'nın çarpımı olarak tanımlanır ve Nusselt sayısı baz sıcaklık gradyanına bölünerek elde edilir:
+\begin{equation}
+\mathrm{Nu} = 1 + \frac{\langle v\,\theta\rangle}{\kappa\,(\Delta T/L_{y})}
+= 1 + \mathrm{Re}\,\mathrm{Pr}\,\frac{L_{y}}{\Delta T}\,\langle v\,\theta\rangle.
+\label{eq:nusselt}
+\end{equation}
+$\mathrm{Nu}=1$ saf iletim (kondüksiyon), $\mathrm{Nu}\gg 1$ ise konveksiyonun ısı transferini önemli ölçüde artırdığı durumu gösterir. Bu çalışmada $\theta$, sıcaklık birimlerinde (ham fiziksel sıcaklık) bir fluktüasyon olarak tanımlanmıştır; baz gradyan $\partial T_{\mathrm{base}}/\partial y = -\Delta T/L_{y}$ formülün paydasında yer alır.
+
+\paragraph{Sıcaklık dalgalanma şiddeti.} Sıcaklık alanının uzaysal RMS değeri,
+\begin{equation}
+\theta_{\mathrm{rms}} = \sqrt{\langle \theta^{2}\rangle},
+\label{eq:theta_rms}
+\end{equation}
+ile tanımlanır. Bu metrik, sıcaklık alanının dalgalanmalarının büyüklüğünü ve dolayısıyla termal karışmanın etkinliğini ölçer.
+
+\paragraph{Enerji spektrumu.} Akıştaki enerjinin dalga sayısı $k$ üzerindeki dağılımı, üç boyutlu enerji spektrumu $E(k)$ ile karakterize edilir. İzotropik türbülansta inertial alt-aralıkta Kolmogorov 1941 teorisi $E(k)\sim k^{-5/3}$ ölçeklemesini öngörür \cite{kolmogorov_1941, pope_turbulence_2000}; ancak sonlu LES ızgaralarında ve karışık konveksiyon gibi anizotropik problemlerde gözlenen eğim genellikle $-5/3$'ten biraz daha negatiftir. Bu çalışmada spektrum eğimi $\beta_{E}$, $\log E(k)$ ile $\log k$ arasındaki en küçük kareler doğru oturtmasıyla tahmin edilmiştir.
+
+\section{Doğrudan Sayısal Simülasyon ve Büyük Girdap Simülasyonu}
+
+Türbülanslı akışların sayısal modellenmesinde temel hesaplama paradigmaları DNS, LES ve RANS olarak gruplanır.
+
+\paragraph{DNS.} Kolmogorov mikro-ölçeği $\eta=(\nu^{3}/\varepsilon)^{1/4}$'e kadar tüm uzunluk ölçeklerini doğrudan çözer. Üç boyutlu DNS için gereken ızgara nokta sayısı $N^{3}\sim\mathrm{Re}^{9/4}$ ile artar \cite{pope_turbulence_2000}; $\mathrm{Re}=10\,000$ için $N\sim 10^{3}$ ızgara mertebesinden bahsedilir, ki bu da $\mathcal{O}(10^{9})$ noktayı işaret eder. Bu hesaplama yükü, mevcut donanım sınırları altında tek bir lisans bitirme çalışmasının kapsamı dışındadır.
+
+\paragraph{LES.} Enerji içeren büyük ölçekleri açık biçimde çözer, daha küçük ölçekleri ise bir alt-ızgara (\textit{sub-grid scale, SGS}) modeli aracılığıyla parametrize eder. LES, izotropik türbülansta inertial alt-aralığın doğru temsil edilmesi koşuluyla DNS'den iki büyüklük mertebesine kadar daha az kaynak gerektirir ve büyük ölçekli yapıların doğru biçimde yakalanması bakımından özellikle başarılıdır. Bu çalışmada LES, INNATE modelinin doğrulanması için \emph{referans gerçek} (\textit{ground truth}) olarak benimsenmiştir.
+
+\subsection{Smagorinsky Alt-Izgara Modeli}
+
+LES'in tarihsel olarak en yaygın alt-ızgara modeli Smagorinsky tarafından önerilen statik kapanış modelidir \cite{smagorinsky_1963}:
+\begin{equation}
+\nu_{t}(\mathbf{x},t) = (C_{s}\Delta)^{2}\,|S(\mathbf{x},t)|,
+\quad |S| = \sqrt{2\,S_{ij}S_{ij}},
+\quad S_{ij}=\tfrac{1}{2}\left(\frac{\partial u_{i}}{\partial x_{j}}+\frac{\partial u_{j}}{\partial x_{i}}\right),
+\label{eq:smagorinsky}
+\end{equation}
+burada $\nu_{t}$ eddy (alt-ızgara) viskozitesi, $\Delta$ ızgara filtre uzunluğu, $|S|$ gerinim tensörü genliği ve $C_{s}$ Smagorinsky sabitidir. Homojen izotropik türbülansta $C_{s}\approx 0.17$ önerilirken duvar-sınırlı akışlarda daha küçük değerler kullanılır. Bu çalışmada LES referans çözümleri için $C_{s}=0.17$ seçilmiştir.
+
+Termal alan için Smagorinsky tarzı bir SGS difüzivitesi
+\begin{equation}
+\alpha_{t} = \frac{\nu_{t}}{\mathrm{Pr}_{t}},
+\label{eq:turbulent_prandtl}
+\end{equation}
+ile tanımlanır; $\mathrm{Pr}_{t}\approx 0.85$ türbülans Prandtl sayısıdır \cite{kays_turbulent_prandtl_1994}.
+
+\subsection{Anizotropik Damping ve Sayısal Kararlılık}
+
+Periyodik küp benzeri bölgede Boussinesq kaldırma kuvveti kararsızlık doğurabilir. Bu çalışmadaki LES referansında, dikey hız bileşeni ve sıcaklık dalgalanması için anizotropik bir damping profili uygulanmıştır:
+\begin{equation}
+\mathbf{f}_{\mathrm{damp}} = -\gamma(\mathbf{x})\,(w\,\hat{\mathbf{z}}, \theta),
+\qquad
+\gamma(\mathbf{x}) = \gamma_{0}\,\sigma\!\left(\frac{z-z_{c}}{\delta}\right),
+\label{eq:anisotropic_damping}
+\end{equation}
+şeklinde, dikey yön civarında konsantre, yatay düzlemlerde önemsiz bir damping kuvvetidir \cite{calzavarini_damping_2014}. Bu terim ısı transferi yapısını korurken numerik kararsızlık modlarını bastırır ve LES çözücüsünün uzun zaman ufuklarında kararlı kalmasını sağlar.
+
+\section{Fiziksel Sinir Mimarileri ve INNATE Paradigması}
+
+Makine öğrenmesi tabanlı türbülans modellemesinde üç temel paradigma vardır.
+
+\paragraph{(a) Saf veri tabanlı operatör öğrenme.} Fourier neural operator (FNO) ve DeepONet gibi yaklaşımlar, bir önceki zaman adımındaki çözümden bir sonraki adımdaki çözüme doğrudan harita öğrenir \cite{li_fno_2021, lu_deeponet_2021}. Bu yaklaşımların avantajı genellik ve hızdır; dezavantajı ise büyük etiketli veri kümelerine bağımlılık ve fiziksel garantilerin (örneğin diverjanssızlık, enerji dengesi) sıkı bir biçimde sağlanmamasıdır.
+
+\paragraph{(b) Fizik bilgili sinir ağları (PINN).} Fiziksel denklemleri kayıp fonksiyonuna ekler \cite{raissi_pinn_2019}. PINN'in başarısı kayıp terimleri arasındaki ağırlık dengesine ve otomatik türev hesaplarının sayısal kararlılığına yüksek oranda bağlıdır. Yüksek mertebe türevler içeren ve uzun zaman ufuklarına genişleyen problemlerde gradyan patolojileri ve yumuşak kısıtların ihlalinin birikmesi, modelin enerjik açıdan dengesizleşmesine yol açar \cite{krishnapriyan_failure_2021, wang_gradient_2021}.
+
+\paragraph{(c) Hibrit yaklaşımlar.} Klasik bir sayısal çözücünün üzerine küçük ölçekli düzeltmeler öğrenir \cite{kochkov_ml_cfd_2021, lesnets_2024}. Bu yaklaşımlar pratikte oldukça başarılıdır, ancak temel çözücünün karmaşıklığını ve sınırlamalarını miras alırlar.
+
+\paragraph{INNATE yaklaşımı.} Bu çalışmada savunulan INNATE paradigması, yukarıdaki üç ana akımdan farklı bir konumda durur. INNATE'in temel ilkesi şudur: \emph{fiziksel operatörler ne kayıp fonksiyonuna eklenmiş cezalar olarak, ne de bir dış çözücüye ekleme düzeltmeler olarak, doğrudan ağı oluşturan nöronlar olarak tanımlanmalıdır}. Bu ilkenin somut anlamı şudur: adveksiyon nöronu $(\mathbf{u}\cdot\nabla)\mathbf{u}$ değerini içsel olarak hesaplar, difüzyon nöronu $\nu\nabla^{2}\mathbf{u}$ değerini içsel olarak hesaplar, projeksiyon nöronu basınç Poisson denklemini çözerek diverjans-serbest projeksiyonu içsel olarak uygular ve böylece her bir nöron klasik bir akışkanlar mekaniği operatörünü doğrudan temsil eder. Öğrenilebilir parametreler, bu operatörlerin nasıl birleştirildiğini ve hangi katsayılarla ağırlıklandırıldığını belirleyen, fiziksel olarak yorumlanabilir küçük bir parametre kümesinden ibarettir.
+
+Bu yaklaşımın üç temel avantajı vardır. Birincisi, fiziksel garantiler \emph{yapısal} olarak sağlanır: diverjanssızlık projeksiyon nöronu tarafından, viskoz sönüm difüzyon nöronu tarafından, ısı taşınımı sıcaklık-adveksiyon nöronu tarafından doğrudan korunur ve bunlar ihmali mümkün olmayan zorunlu adımlardır. İkincisi, parametre sayısı dramatik biçimde azalır; bu çalışmada model 9905 trainable parametre içerir, bu da klasik MLP tabanlı operatör öğrenme modellerinden yaklaşık iki büyüklük mertebesi daha azdır. Üçüncüsü, her parametre fiziksel olarak yorumlanabilir; örneğin bir parametre Smagorinsky sabitinin etkili çarpanı, bir diğeri kaldırma kuvveti büyüklük katsayısıdır.
+
+\subsection{Bitirme Projesi 1'den Bu Çalışmaya Evrim}
+
+Ön dönemde yapılan TGV3D çalışmasında \cite{tezgocen_bitirme1_2026} INNATE ilk kez kavramsal olarak ortaya konmuş ve adveksiyon, difüzyon, projeksiyon, vortisite ve helisite nöronlarından oluşan ilk mimari prototipi sunulmuştur. Ancak söz konusu prototipte \emph{PhysicsModulator} adı verilen bir MLP modülü bulunmaktaydı; bu modül 6 global skaler özellikten 3 ölçeklendirme katsayısı üretmek için yaklaşık 800 öğrenilebilir parametre kullanıyordu. Bu bölüm, fiziksel olarak \emph{kara kutu} bir yorum içeriyordu ve mimarinin saf-fizik niteliğini tartışmaya açıyordu.
+
+Bu çalışmada PhysicsModulator MLP modülü tamamen kaldırılmıştır. Yerine, sayısı artırılmış ama tek başlarına çok az parametre içeren çok sayıda fiziksel nöron yerleştirilmiş ve birbirlerine yapısal olarak bağlanmıştır. Bu kararın motivasyonu, bir MLP'nin 6 girdi-skalerinden anlamlı bir fizik ölçeklemesi öğrenemeyeceği; bunun yerine \emph{çok sayıda fiziksel nöronun} bir ağ oluşturarak problemin kendisini öğrenmesi gerektiği gözlemine dayanmaktadır. Bu kararın ardındaki ayrıntılı tartışma ve mimari sonuçları Bölüm~\ref{ch:mimari}'de sunulur.
+
+\subsection{INNATE'in Yapısal Garantileri}
+
+INNATE mimarisinde aşağıdaki fiziksel garantiler \emph{yapısal} olarak sağlanır.
+
+\begin{itemize}
+  \item \textbf{Diverjanssızlık.} Her zaman adımı sonunda projeksiyon nöronu uygulanır ve $\nabla\cdot\mathbf{u}=0$ koşulu spektral yöntemler kullanılarak yapısal olarak sağlanır. Bu, PINN paradigmasında yumuşak kısıt olarak uygulanan koşulun aksine, çıktının tanımı gereği sağlandığı bir koşuldur.
+
+  \item \textbf{Enerji-koruyucu adveksiyon formu.} Adveksiyon operatörü, sürekli zamanda diverjans-serbest hız alanı için toplam kinetik enerjiye katkı vermeyen (L²-integralinde sıfır) bir formda hesaplanır: bu çalışmada \emph{Lamb (rotasyonel) form} $\boldsymbol{\omega}\times\mathbf{u}+\nabla(\tfrac{1}{2}|\mathbf{u}|^{2})$ varsayılan olarak kullanılır; alternatif olarak skew-simetrik form $\tfrac{1}{2}[(\mathbf{u}\cdot\nabla)\mathbf{u}+\nabla\cdot(\mathbf{u}\otimes\mathbf{u})]$ de mevcuttur. Ayrık zamanda kesin korunum sağlanmaz; ancak konvektif veya divergence formuna kıyasla enerji drift'i belirgin biçimde sınırlanır \cite{morinishi_skew_1998}.
+
+  \item \textbf{Kaldırma kuvveti tutarlılığı.} Boussinesq terimi denklem~\eqref{eq:buoyancy}'deki katsayılarla doğrudan uygulanır; öğrenilebilir bir kaldırma katsayısı yoktur (\textit{frozen} olarak sabitlenmiştir).
+
+  \item \textbf{Alt-ızgara viskozitesinin pozitifliği.} Eddy viskozitesi $\nu_{t}\geq 0$ koşulu yapısal olarak (clamp ile) sağlanır; geri-saçılma (\textit{backscatter}) terimi de bu pozitiflik içinde sınırlandırılmıştır.
+
+  \item \textbf{Sıcaklık dengesi.} Termal denklem~\eqref{eq:ns_energy} momentum ile aynı fraksiyonel adım yapısı içinde çözülür; aynı zaman adımı, aynı projeksiyon sonrası hız alanı kullanılır ve termal-momentum bölünme hatasından kaynaklanan tutarsızlıklar yapısal olarak ortadan kaldırılır.
+\end{itemize}
+
+Bu yapısal garantiler, modelin başarılı olduğu durumlarda fizik tutarlılığını otomatik olarak korumasını sağlar; başarısız olduğu durumlarda ise başarısızlığın kaynağının fiziksel kısıtların ihlali değil, parametre öğrenmesinin yetersizliği veya ağ topolojisinin yetersizliği olduğu kesin biçimde söylenebilir. Bu ayrım, başarısızlık analizinin ve düzeltmenin metodolojik olarak temizlenmesini sağlar.

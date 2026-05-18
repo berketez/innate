@@ -1,0 +1,429 @@
+\chapter{Neural Operators ve INNATE Konsepti}
+\label{ch:neural_operators}
+
+Bu bolumde, kismi diferansiyel denklem (PDE) cozumune makine ogrenmesi perspektifinden yaklasan yontemleri inceliyoruz. Geleneksel cozuculerden baslayarak, PINN ve FNO gibi guncel yaklasimlardan gecip, projemizin temelini olusturan INNATE konseptine ulasacagiz.
+
+
+% ============================================================
+\section{Geleneksel PDE Cozuculeri}
+\label{sec:geleneksel}
+
+\subsection{Mevcut Yontemler}
+
+PDE cozumu icin dort ana sayisal yontem vardir:
+
+\begin{description}
+\item[FDM (Finite Difference Method):] Turevleri Taylor acilimi ile yaklasik hesaplar. Basit, ama yapisiz gridlerde zorluklu.
+\item[FEM (Finite Element Method):] Zayif (weak) formda cozum. Karmasik geometrilere uyumlu. Yapisal mekanik ve isi transferinde baskın.
+\item[FVM (Finite Volume Method):] Korunum denklemlerini hacim integrasyon ile cozer. CFD'de en yaygin (OpenFOAM, Fluent).
+\item[Spectral:] Fourier/Chebyshev bazlarinda cozum. Üstel doğruluk ama sadece basit geometrilerde (Bolum~\ref{ch:spectral}).
+\end{description}
+
+\subsection{Ortak Sorun: Hesaplama Maliyeti}
+
+Tum bu yontemlerin ortak siniri: \textbf{her parametre seti icin bastan cozum gerekir}.
+
+$\Rey = 5000$'de mixed convection problemini cozdugunuzu dusunun. Sonra $\Rey = 5500$ icin istiyorsunuz --- tum hesaplamayi \textbf{sifirdan} tekrarlamaniz gerekir. Grid olustur, baslangic kosullarini ata, zaman adimlarini isle\ldots
+
+\begin{equation}
+\text{100 farkli parametre} \times \text{her biri 10 saat} = \text{1000 saat hesaplama}
+\end{equation}
+
+Tasarim optimizasyonu, belirsizlik analizi, parametre taramasi gibi uygulamalarda bu maliyet kaldirilamaz.
+
+
+% ============================================================
+\section{Veri-Gudumlu Yaklasimlar}
+\label{sec:data_driven}
+
+Makine ogrenmesinin vaat ettigi: \textbf{bir kere egit, sonra aninda tahmin et}.
+
+\subsection{Saf Veri-Gudumlu Modeller}
+
+En basit yaklasim: DNS verisinden bir sinir agi egit.
+\begin{equation}
+\text{Girdi: } (\Rey, \Ray, t, \vect{x}) \quad\xrightarrow{\text{NN}}\quad \text{Cikti: } (\vect{u}, p, T)
+\end{equation}
+
+\textbf{Avantajlar:}
+\begin{itemize}
+\item Inference cok hizli (millisaniyeler)
+\item Herhangi bir parametreye genellestirebilir (teoride)
+\end{itemize}
+
+\textbf{Dezavantajlar:}
+\begin{itemize}
+\item \textbf{Fizik bilgisi yok}: Sureklilik, enerji korunumu, sinir kosullari ihlal edilebilir
+\item \textbf{Genellestirme zayif}: Egitim dağılımının disinda (out-of-distribution) tahminler guvenilmez
+\item \textbf{Veri ihtiyaci cok}: Yuzlerce/binlerce DNS simulasyonu gerekir
+\item \textbf{Yorumlanabilirlik yok}: Model ne ogrendi, neden bu sonucu verdi bilinmez
+\end{itemize}
+
+
+% ============================================================
+\section{PINN (Physics-Informed Neural Networks)}
+\label{sec:pinn}
+
+\subsection{Temel Fikir}
+
+Raissi, Perdikaris ve Karniadakis (2019) tarafindan populerlestirilen PINN'ler, fizik bilgisini \textbf{loss fonksiyonuna} gömer.
+
+Standart bir sinir agi $u_\theta(\vect{x}, t)$ fiziksel alanin yaklasik cozumudur. Egitim kaybi:
+
+\begin{equation}
+\mathcal{L} = \underbrace{\mathcal{L}_{\text{data}}}_{\text{veri uyumu}} + \lambda\underbrace{\mathcal{L}_{\text{physics}}}_{\text{fizik kisiitlari}}
+\label{eq:pinn_loss}
+\end{equation}
+
+Navier-Stokes icin fizik kaybi:
+\begin{equation}
+\mathcal{L}_{\text{physics}} = \left\|\pd{\vect{u}}{t} + (\vect{u}\cdot\gradient)\vect{u} + \gradient p - \nu\laplacian\vect{u}\right\|^2 + \left\|\divergence\vect{u}\right\|^2
+\label{eq:pinn_physics}
+\end{equation}
+
+\subsection{Calisma Prensibi}
+
+\begin{enumerate}
+\item Sinir agini rastgele $(\vect{x}, t)$ noktalarinda degerlendir.
+\item Otomatik turev (autograd) ile $\partial u/\partial t$, $\partial u/\partial x$, \ldots hesapla.
+\item PDE residualini hesapla --- bu sifir olmali.
+\item Residual + veri uyumu kaybi ile ağı eğit.
+\end{enumerate}
+
+\subsection{Avantaj ve Dezavantajlar}
+
+\textbf{Avantajlar:}
+\begin{itemize}
+\item Az veri ile calisir (fizik bilgisi veriyi tamamlar)
+\item Ters problemler cozebilir (bilinmeyen parametreleri tahmin)
+\item Grid-free: herhangi bir $(\vect{x},t)$ noktasinda degerlendirebilir
+\end{itemize}
+
+\textbf{Dezavantajlar:}
+\begin{itemize}
+\item \textbf{Yavas egitim}: Her adimda autograd ile turev hesabi pahali
+\item \textbf{Her problem icin yeniden egit}: Parametreler degisince ($\Rey$, geometri, \ldots) yeni egitim
+\item \textbf{Mesh-bagimlilik}: Collocation noktalarinin dağılımı sonucu etkiler
+\item \textbf{Zor optimizasyon}: Fizik kaybi ile veri kaybi arasinda dengeleme (``stiff'' gradyanlar)
+\item \textbf{Turbulansda basarisiz}: Kaotik akislarda loss landscape cok karmasik, egitim yakinsamaz
+\end{itemize}
+
+
+% ============================================================
+\section{FNO (Fourier Neural Operator)}
+\label{sec:fno}
+
+\subsection{Temel Fikir}
+
+Li et al. (2021), tamamen farkli bir bakis acisi sundu: \textbf{operatör öğrenme}. Fonksiyondan fonksiyona eşleme:
+\begin{equation}
+\mathcal{G}_\theta: a(\vect{x}) \mapsto u(\vect{x})
+\end{equation}
+
+Ornegin: baslangic kosulundan ($a = u_0$) belirli bir zamandaki cozume ($u = u(T)$) esleme.
+
+\subsection{FNO Katmani}
+
+Her FNO katmani su yapidadir:
+\begin{equation}
+v_{l+1}(\vect{x}) = \sigma\!\Big(\underbrace{W_l\cdot v_l(\vect{x})}_{\text{lokal (lineer)}} + \underbrace{\mathcal{K}_l(v_l)(\vect{x})}_{\text{global (Fourier)}}\Big)
+\label{eq:fno_layer}
+\end{equation}
+
+Fourier integral operatoru $\mathcal{K}_l$:
+\begin{equation}
+\mathcal{K}_l(v)(\vect{x}) = \mathcal{F}^{-1}\!\Big[R_l(\vect{k})\cdot\mathcal{F}[v](\vect{k})\Big](\vect{x})
+\label{eq:fno_kernel}
+\end{equation}
+
+Yani:
+\begin{enumerate}
+\item $v$'yi Fourier uzayina tasi (FFT).
+\item $R_l(\vect{k})$ matrisi ile carp (ogrenilebilir, her dalga sayisi icin farkli).
+\item Fiziksel uzaya geri don (IFFT).
+\end{enumerate}
+
+\textbf{Neden çalisir?} Konvolusyon teoremi: fiziksel uzayda konvolusyon $=$ Fourier uzayinda carpma. FNO, ogrenilmis bir integral kernel'i temsil eder.
+
+\subsection{Avantaj ve Dezavantajlar}
+
+\textbf{Avantajlar:}
+\begin{itemize}
+\item \textbf{Mesh-bagimsiz}: Farkli cozunurluklerde degerlendirebilir
+\item \textbf{Hizli inference}: Bir kere egit, aninda tahmin et
+\item \textbf{Iyi genellestirme}: Ayni mimari, farkli parametrelere genellesir
+\end{itemize}
+
+\textbf{Dezavantajlar:}
+\begin{itemize}
+\item \textbf{Kara kutu}: $R_l(\vect{k})$ matrisleri fiziksel anlam tasimaz
+\item \textbf{Cok veri gerekir}: Yuzlerce/binlerce DNS simulasyonundan egitim verisi
+\item \textbf{Fizik garanti yok}: $\divergence\vect{u} = 0$ saglanamaz, enerji korunmaz
+\item \textbf{Yuksek parametre sayisi}: $\sim 10^6$ parametre --- overfitting riski
+\end{itemize}
+
+
+% ============================================================
+\section{DeepONet}
+\label{sec:deeponet}
+
+\subsection{Temel Fikir}
+
+Lu et al. (2021), universal approximation theorem'in operatorlere genellemesine dayanarak DeepONet'i onerdi.
+
+\textbf{Yapii:} Iki ayri alt ag:
+\begin{itemize}
+\item \textbf{Branch network}: Girdi fonksiyonunu $a(x)$'i kodlar $\to$ $[b_1, \ldots, b_p]$
+\item \textbf{Trunk network}: Sorgu noktasi $\vect{y}$'yi kodlar $\to$ $[t_1, \ldots, t_p]$
+\end{itemize}
+
+Cikti:
+\begin{equation}
+\mathcal{G}_\theta(a)(\vect{y}) = \sum_{k=1}^{p} b_k(a)\cdot t_k(\vect{y})
+\label{eq:deeponet}
+\end{equation}
+
+\begin{remark}
+DeepONet, FNO'dan konsept olarak daha genel (sadece Fourier bazina bagliml degil), ama pratikte FNO akiskanlar problemlerinde daha basarili olmustur.
+\end{remark}
+
+
+% ============================================================
+\section{INNATE Konsepti}
+\label{sec:innate}
+
+\subsection{Motivasyon}
+
+Yukaridaki yaklaşımların hepsinde ortak bir sorun var: \textbf{fizik bilgisi ya zayif (loss'ta) ya da yok (kara kutu)}. INNATE tamamen farkli bir yol izler.
+
+\subsection{Temel Fikir}
+
+\begin{quote}
+\textit{Navier-Stokes denklemlerinin HER TERiMi bir noron olsun.\\
+Aginn yapisi = sayisal cozum adimlari.\\
+Ogrenilen parametreler = fiziksel katsayilar.}
+\end{quote}
+
+Bunu somutlastiralim. NS momentum denklemi:
+\begin{equation}
+\underbrace{\pd{\vect{u}}{t}}_{\text{zaman evrimi}} = \underbrace{-(\vect{u}\cdot\gradient)\vect{u}}_{\text{Advection3D}} + \underbrace{\nu\laplacian\vect{u}}_{\text{Diffusion}} + \underbrace{-\gradient p}_{\text{Projection3D}} + \underbrace{\vect{F}}_{\text{Forcing3D}} + \underbrace{g\beta(T-T_0)\hat{e}_y}_{\text{Buoyancy3D}}
+\label{eq:innate_ns}
+\end{equation}
+
+Her terimi bir \texttt{nn.Module} olarak implemente ediyoruz:
+
+\begin{description}
+\item[Advection3D:] $-(\vect{u}\cdot\gradient)\vect{u}$ hesaplar. Spectral turevler kullanir. Ogrenilebilir parametre: \texttt{advection\_modulator} (adveksiyon gucunu ayarlar).
+
+\item[Diffusion:] $\nu\laplacian\vect{u}$ hesaplar. Spectral Laplacian kullanir. Ogrenilebilir parametre: \texttt{diffusion\_scale} (efektif viskoziteyi ayarlar).
+
+\item[Projection3D:] $\divergence\vect{u} = 0$ kisitini zorlar. Helmholtz ayrışması (Bolum~\ref{subsec:projection}) uygular. Ogrenilebilir parametre: \texttt{pressure\_scale} (projeksiyon agresifligini ayarlar).
+
+\item[Forcing3D:] $\vect{F}$ dis kuvvetini uygular (Kolmogorov forcing). Ogrenilebilir parametreler: \texttt{amplitude}, forcing profil genligini ayarlar.
+
+\item[Buoyancy3D:] $g\beta(T-T_0)\hat{e}_y$ termal kaldirma kuvveti. Ogrenilebilir parametre: \texttt{buoyancy\_strength}.
+
+\item[EddyViscosity3D:] $\nu_t = (C_s\Delta)^2|\bar{S}|$ SGS modeli (Bolum~\ref{sec:eddy_viscosity_innate}). Ogrenilebilir parametre: $C_s$.
+
+\item[ThermalDiffusion3D:] $\kappa\laplacian T$ termal difuzyon. Ogrenilebilir parametre: \texttt{kappa\_scale}.
+
+\item[ThermalAdvection3D:] $-(\vect{u}\cdot\gradient)T$ termal adveksiyon. Parametresiz (saf operatör).
+\end{description}
+
+\subsection{Ag Yapisi = Zaman Adimi}
+
+Bir INNATE forward pass'i, NS'nin bir zaman adimina karsilik gelir:
+
+\begin{equation}
+\vect{u}^{n+1} = \vect{u}^n + \Delta t\cdot\Big[\underbrace{\text{Adv}(\vect{u}^n)}_{\text{Advection3D}} + \underbrace{\text{Diff}(\vect{u}^n)}_{\text{Diffusion}} + \underbrace{\text{Force}}_{\text{Forcing3D}} + \underbrace{\text{Buoy}(T^n)}_{\text{Buoyancy3D}}\Big]
+\label{eq:innate_step1}
+\end{equation}
+\begin{equation}
+\vect{u}^{n+1} \leftarrow \underbrace{\text{Proj}(\vect{u}^{n+1})}_{\text{Projection3D}} \qquad\text{(divergence-free yap)}
+\label{eq:innate_step2}
+\end{equation}
+
+Bu, standart bir \textbf{fractional step} (Chorin projection) yonteminin birebir neural network versiyonudur.
+
+\subsection{Yorumlanabilirlik}
+
+INNATE'in en guclu ozelligi: \textbf{her parametre fiziksel anlam tasir}.
+
+\begin{table}[H]
+\centering
+\caption{INNATE öğrenilebilir parametreleri ve fiziksel anlamlari}
+\label{tab:innate_params}
+\begin{tabular}{llcc}
+\toprule
+\textbf{Noron} & \textbf{Parametre} & \textbf{Başlangıç} & \textbf{Fiziksel Anlam} \\
+\midrule
+Advection3D & \texttt{advection\_modulator} & 1.0 & Adveksiyon gucu \\
+Diffusion & \texttt{diffusion\_scale} & 1.0 & $\nu_{\text{eff}}/\nu$ orani \\
+Projection3D & \texttt{pressure\_scale} & 1.0 & Projeksiyon gucuu \\
+Forcing3D & \texttt{amplitude} & 1.0 & Forcing genligi \\
+Buoyancy3D & \texttt{buoyancy\_strength} & 1.0 & Kaldirma kuvveti gucu \\
+EddyViscosity3D & \texttt{smagorinsky\_coeff} & 0.15 & Smagorinsky $C_s$ \\
+ThermalDiffusion3D & \texttt{kappa\_scale} & 1.0 & Termal difuzivite orani \\
+ThermalAdvection3D & (parametresiz) & --- & Saf operatör \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Toplam: \textbf{$\sim$10 parametre}. Bir FNO veya PINN'de $\sim10^6$ parametre varken, INNATE $10^4$--$10^5$ kat daha az parametreyle calisir.
+
+\begin{remark}
+$C_s = 0.18$ ogrendiyse, bunun fiziksel anlami var: ``bu grid ve bu $\Rey$ icin optimal Smagorinsky katsayisi 0.18'dir.'' Bir FNO'nun ogrendigi $R_l(\vect{k})$ matrisinden boyle bir yorum cikaramazsiniz.
+\end{remark}
+
+
+% ============================================================
+\section{INNATE vs Digerleri}
+\label{sec:comparison}
+
+\begin{table}[H]
+\centering
+\caption{PDE cozum yontemlerinin karşılaştırması}
+\label{tab:comparison}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Ozellik} & \textbf{DNS} & \textbf{PINN} & \textbf{FNO} & \textbf{INNATE} \\
+\midrule
+Fizik bilgisi & Tam & Loss'ta & Yok & \textbf{Yapisal} \\
+Parametre sayisi & -- & $\sim10^6$ & $\sim10^6$ & $\sim10^1$ \\
+Yorumlanabilirlik & Tam & Dusuk & Cok dusuk & \textbf{Yuksek} \\
+Egitim verisi & -- & Az & \textbf{Cok} & Yok \\
+Inference hizi & Yavas & Orta & Hizli & \textbf{Hizli} \\
+Genellestirme & Yok & Sinirli & Iyi & Iyi \\
+$\divergence\vect{u}=0$ & Tam & Yaklasik & Yok & \textbf{Tam} \\
+Enerji korunumu & Tam & Yaklasik & Yok & \textbf{Yapisal} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Kritik Farklar}
+
+\begin{enumerate}
+\item \textbf{Fizik bilgisinin yeri:}
+\begin{itemize}
+\item PINN: Fizik, loss fonksiyonunda (``\textit{cezalandir}'')
+\item FNO: Fizik yok, tamamen veriden ogren
+\item INNATE: Fizik, ag yapisinda (``\textit{yapisal olarak zorla}'')
+\end{itemize}
+
+Ornek: $\divergence\vect{u} = 0$. PINN bunu loss'a ekler, ama tam olarak saglanamaz. FNO bu kisiti hiç bilmez. INNATE'te Projection3D noronu \textbf{her zaman adiminda} divergence-free projeksiyon uygular --- matematiksel olarak garanti.
+
+\item \textbf{Parametre sayisi ve overfitting:}
+
+$10^6$ parametreli bir FNO'yu egitmek icin binlerce DNS simulasyonu gerekir (yoksa overfitting). INNATE'te $\sim10$ fiziksel parametre var --- overfitting riski ihmal edilebilir. Hatta veriye bile ihtiyac yok (physics-only training).
+
+\item \textbf{Genellestirme mekanizmasi:}
+
+FNO: ``Yeterince veri görürse, yeni parametreleri de iyi tahmin eder'' (istatistiksel genellestirme).
+INNATE: ``NS denklemleri zaten dogru, sadece katsayilari kalibre et'' (fiziksel genellestirme). Bu ikinci yaklasim çok daha guvenilirdir.
+\end{enumerate}
+
+
+% ============================================================
+\section{Physics-Only Training}
+\label{sec:physics_only}
+
+INNATE'in en şasirtici ozelligi: \textbf{DNS verisi kullanilmadan eğitilebilir}.
+
+\subsection{Nasil Mumkun?}
+
+INNATE'in forward pass'i zaten NS'yi yapisal olarak cozer. Eger noron parametreleri doğru kalibre edilmişse, cikti fiziksel olarak dogru olacaktir. Parametreleri kalibre etmek icin DNS \emph{verisi} degil, \textbf{fiziksel kisitlar} yeterlidir:
+
+\begin{align}
+\mathcal{L}_{\text{total}} &= w_1\,\mathcal{L}_{\text{div}} + w_2\,\mathcal{L}_{\text{energy}} + w_3\,\mathcal{L}_{\text{spectrum}} + \cdots \label{eq:physics_loss}
+\end{align}
+
+Ornek fiziksel kisitlar:
+\begin{itemize}
+\item $\mathcal{L}_{\text{div}} = \|\divergence\vect{u}\|^2$: Sureklilik denklemi
+\item $\mathcal{L}_{\text{energy}}$: Kinetik enerjinin fiziksel sinirlar icinde kalmasi
+\item $\mathcal{L}_{\text{spectrum}}$: Enerji spektrumunun $-5/3$ yasasina uymasi
+\item $\mathcal{L}_{\text{Nusselt}}$: Nusselt sayisinin fiziksel degerlerle uyumu
+\end{itemize}
+
+\subsection{DNS'in Rolu}
+
+DNS verisi egitimde kullanilmaz. DNS sadece \textbf{validasyon} icindir: ``INNATE'in urettigi sonuc, DNS sonucu ile ne kadar uyumlu?''
+
+Bu, bilimsel yontemin temelidir:
+\begin{itemize}
+\item \textbf{Teori} (INNATE yapisi = NS denklemleri)
+\item \textbf{Kalibrasyon} (physics-only training = parametre ayari)
+\item \textbf{Dogrulama} (DNS karsilastirmasi = deneysel test)
+\end{itemize}
+
+
+% ============================================================
+\section{INNATE'in Mimari Evrimi}
+\label{sec:mimari_evrim}
+
+\subsection{Ilk Versiyon: PINN-INNATE Hibrit}
+
+Projenin ilk versiyonunda her INNATE katmanina bir MLP (PhysicsModulator) eklenmisti:
+\begin{equation}
+\text{Scale} = \text{MLP}(E, \mathcal{Z}, \|\divergence\vect{u}\|, t) \qquad\text{(6 girdi} \to \text{3 cikti)}
+\end{equation}
+
+Bu hibrit yaklasimda:
+\begin{itemize}
+\item Toplam $10{,}144$ parametre
+\item Bunun $10{,}116$'si (\%99.7) MLP'de
+\item Sadece $28$'i INNATE noronlarinda
+\end{itemize}
+
+\subsection{63 Saatlik Başarısızlık}
+
+Hibrit modelin 63 saatlik egitimi basarisiz oldu. Sebepleri:
+\begin{enumerate}
+\item \textbf{EddyViscosity3D KAPALI}: Grid-scale dissipasyon yok $\to$ enerji birikimi $\to$ patlama
+\item \textbf{MLP fizigin yerine gecmeye calisiyor}: 6 global skalerden 3 scale faktörü ogrenmeye calismak --- kara kutu
+\item \textbf{Yanlis loss tasarimi}: Nusselt loss'ta $\text{relu}(1-\text{Nu})^2$ kullanildi $\to$ $\text{Nu}\geq1$ olunca gradyan sifir
+\item \textbf{Stabilite loss'u turbulansi engelliyor}: $\text{relu}(\mathcal{Z}/\mathcal{Z}_\text{ref}-10)^2$ $\to$ enstrofi artisini cezalandirir
+\end{enumerate}
+
+\subsection{Yeni Mimari: Saf INNATE}
+
+Kritik karar (2026-02-18): \textbf{MLP'ler kaldirilacak}.
+
+Yeni prensip:
+\begin{quote}
+INNATE noronlari, bir sinir agindaki noronlar \textbf{gibi} dusunulmeli.
+Bir tane Advection3D degil, \textbf{yuzlerce} Advection3D noronu kullanilacak.
+Her noronun kendi fiziksel parametreleri var.
+Noronlarin ag yapisi, problemi ogreniyor --- MLP'ye gerek yok.
+\end{quote}
+
+\begin{equation}
+\underbrace{\text{12 katman} \times (1\;\text{fizik noron} + 1\;\text{MLP}[843\;\text{param}])}_{\text{YANLIS: hibrit}}
+\quad\neq\quad
+\underbrace{\text{Yuzlerce fizik noronu} \to \text{ag olusturur}}_{\text{DOGRU: saf INNATE}}
+\end{equation}
+
+Bu yeni mimaride:
+\begin{itemize}
+\item Her noron 1--3 parametre tasir
+\item Toplam binlerce parametre (hepsi fizik tabanli)
+\item MLP sifir --- tamamen yorumlanabilir
+\item LES (EddyViscosity3D) ACIK --- grid analizi bunu zorunlu kildi
+\end{itemize}
+
+
+% ============================================================
+\section{Bu Bolumun Ozeti}
+
+\begin{enumerate}
+\item \textbf{Geleneksel cozuculer}: Her parametre icin yeniden coz --- pahali.
+\item \textbf{PINN}: Fizigi loss'a gom, ama yavas ve turbulansda basarisiz.
+\item \textbf{FNO}: Fourier uzayinda ogren, hizli ama kara kutu ve cok veri gerek.
+\item \textbf{DeepONet}: Branch+Trunk yapisi, operator ogrenme.
+\item \textbf{INNATE}: NS'nin her terimi bir noron. Yapisal fizik, $\sim10$ ogrenilebilir parametre, physics-only training.
+\item \textbf{Karsilastirma}: INNATE, yorumlanabilirlik ve fizik garantisi acisindan diger yontemlerden ustun.
+\item \textbf{Physics-only training}: DNS verisi kullanilmadan, fiziksel kisitlarla kalibre edilir.
+\item \textbf{MLP'siz saf INNATE}: 63 saatlik basarisizliktan alinan ders --- fizik noronlari ag olusturur, kara kutu MLP gereksiz.
+\end{enumerate}
+
+Sonraki bolumlerde, bu konseptin somut uygulamasini --- bizim 3D mixed convection problemimizi (Bolum~\ref{ch:bizim_problem}) ve INNATE mimarisinin detaylarini (Bolum~\ref{ch:innate_mimari}) --- inceleyecegiz.

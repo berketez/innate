@@ -1,0 +1,487 @@
+% ============================================================
+% Bölüm 9: INNATE Mimarisi
+% ============================================================
+
+\chapter{INNATE Mimarisi}
+\label{ch:innate_mimari}
+
+INNATE (Interpretable Neural Network Architecture for Turbulence Emulation), klasik neural operator'lardan temel bir farkla ayrılır: ağdaki her nöron bir \textit{fiziksel operatör}dür. MLP katmanları, attention mekanizmaları veya kara kutu bileşenler yoktur. \"Oğrenilebilir parametreler doğrudan fiziksel anlamlara sahiptir: etkin viskozite, adveksiyon modulatörü, kaldırma kuvveti katsayısı gibi.
+
+
+% ============================================================
+\section{Temel Prensip: Fizik = Ağ Yapısı}
+\label{sec:temel_prensip}
+
+Geleneksel neural network'lerde:
+\[
+    h = \sigma(Wx + b)
+\]
+nöronu, öğrenilen ağırlık matrisi $W$ ve bias $b$ ile girdiye lineer dönüşüm + aktivasyon uygular. Bu nöron \textit{evrensel} ama \textit{yorumlanamazdır}: $W$'nun fiziksel anlamı yoktur.
+
+INNATE'te her nöron, NS denklemlerinin belirli bir terimini hesaplar:
+\begin{align}
+    \text{Advection nöronu:} &\quad -\alpha \cdot (\vect{u} \cdot \gradient)\vect{u} \\
+    \text{Diffusion nöronu:} &\quad \nu_{\text{eff}} \cdot \laplacian \vect{u} \\
+    \text{Projection nöronu:} &\quad \vect{u} - \gradient \phi \quad (\divergence \vect{u} = 0) \\
+    \text{Buoyancy nöronu:} &\quad \beta_{\text{eff}} \cdot \Rich \cdot T' \cdot \hat{\vect{e}}_y
+\end{align}
+Her nöronün bir veya birkaç öğrenilebilir parametresi vardır ($\alpha$, $\nu_{\text{eff}}$, $\beta_{\text{eff}}$, \ldots). Eğitim sonunda bu parametreler fiziksel olarak yorumlanabilir: ``model hangi etkin viskoziteyi öğrendi?'' sorusu doğrudan cevaplanabilir.
+
+\begin{remark}
+Parametre sayısı perspektifi: INNATE yaklaşık $\sim 10$K parametreye sahipken, tipik bir FNO modeli $\sim 10^6$ parametreye sahiptir. Bu $100\times$ fark, INNATE'in yorumlanabilirliğinin ve fiziksel çerçevesinin doğrudan sonucudur.
+\end{remark}
+
+
+% ============================================================
+\section{Nöron Tipleri}
+\label{sec:noron_tipleri}
+
+Aşağıda her nöron tipi, matematiksel formu, fiziksel anlamı ve öğrenilebilir parametreleri ile birlikte tanımlanmıştır.
+
+
+% --- 1. Advection3D ---
+\subsection{Advection3D: Nonlineer Konveksiyon}
+\label{sec:advection_noron}
+
+\textbf{Fiziksel anlam:} Akışkanın momentumunu kendi hız alanıyla taşıması.
+
+\textbf{Matematiksel form (convective form):}
+\begin{equation}
+    \mathcal{A}(\vect{u}) = -\alpha_{\text{adv}} \cdot (\vect{u} \cdot \gradient)\vect{u}
+    \label{eq:advection_neuron}
+\end{equation}
+Bileşen yazımı:
+\begin{equation}
+    \mathcal{A}_i = -\alpha_{\text{adv}} \cdot \sum_{j=1}^{3} u_j \pd{u_i}{x_j}, \quad i \in \{1, 2, 3\}
+    \label{eq:advection_component}
+\end{equation}
+
+\textbf{Hesaplama adımları:}
+\begin{enumerate}
+    \item Türevler spektral olarak hesaplanır: $\widehat{\partial u_i / \partial x_j} = i k_j \hat{u}_i$.
+    \item Fiziksel uzaya döndürülür: $\partial u_i / \partial x_j = \text{IFFT}(\ldots)$.
+    \item Çarpım fiziksel uzayda yapılır: $u_j \cdot (\partial u_i / \partial x_j)$.
+    \item \textbf{Dealiasing} uygulanır (2/3 kuralı veya mode-index bazlı).
+\end{enumerate}
+
+\textbf{Dealiasing neden gerekli?} Fiziksel uzayda iki alanın çarpımı, Fourier uzayında konvolüsyona karşılık gelir. Eğer her iki alan $k_{\max}$'a kadar modlara sahipse, çarpım $2k_{\max}$'a kadar modlar üretir. Grid sadece $k_{\max}$'a kadar çözebildiğinden, $k_{\max}$'ı aşan modlar düşük modlara ``katlanır'' (aliasing). 2/3 kuralı, $k > (2/3)k_{\max}$ modlarını sıfırlayarak bu hatanın birikmesini önler.
+
+\textbf{Öğrenilebilir parametre:}
+\begin{itemize}
+    \item \texttt{advection\_modulator} $(\alpha_{\text{adv}})$: başlangıç değeri $= 1.0$, klamplama: $[0.5, 2.0]$.
+\end{itemize}
+$\alpha_{\text{adv}} = 1$ tam adveksiyon demektir. Model bunu biraz büyütebilir veya küçültebilir: LES gridinde çözülemeyen ince yapıların adveksiyon üzerindeki etkisini modelle.
+
+
+% --- 2. Diffusion ---
+\subsection{Diffusion: Visköz Yayılma}
+\label{sec:diffusion_noron}
+
+\textbf{Fiziksel anlam:} Moleküler viskozite tarafından momentumun yayılması.
+
+\textbf{Matematiksel form:}
+\begin{equation}
+    \mathcal{D}(\vect{u}) = \frac{\nu_{\text{scale}}}{\Rey} \laplacian \vect{u}
+    \label{eq:diffusion_neuron}
+\end{equation}
+
+\textbf{Hesaplama:} Tamamen spektral uzayda:
+\begin{equation}
+    \widehat{\laplacian u_i} = -(k_x^2 + k_y^2 + k_z^2) \hat{u}_i = -|\vect{k}|^2 \hat{u}_i
+    \label{eq:spectral_laplacian}
+\end{equation}
+Bu işlem FFT + çarpım + IFFT olarak çok ucuzdur.
+
+\textbf{Öğrenilebilir parametre:}
+\begin{itemize}
+    \item \texttt{diffusion\_scale} $(\nu_{\text{scale}})$: başlangıç $= 1.0$, klamplama: $[0.1, 3.0]$.
+\end{itemize}
+$\nu_{\text{scale}} = 1$ dolaylı moleküler viskoziteyi verir. Model bunu $> 1$ yaparak etkin viskoziteyi artırabilir --- LES grid'inde çözülemeyen küçük ölçeklerin dissipasyonunu kaba bir şekilde modellemek için.
+
+
+% --- 3. EddyViscosity3D ---
+\subsection{EddyViscosity3D: LES Nöronu}
+\label{sec:eddy_noron}
+
+\textbf{Fiziksel anlam:} Çözülemeyen küçük ölçeklerin büyük ölçekler üzerindeki etkisini modeller (subgrid-scale modeli).
+
+\textbf{Matematiksel form (Smagorinsky):}
+\begin{equation}
+    \mathcal{E}(\vect{u}) = \divergence \left( \nu_t \, \gradient \vect{u} \right)
+    \label{eq:eddy_neuron}
+\end{equation}
+\begin{equation}
+    \nu_t = (C_s \, \bar{\Delta})^2 \, |\tensor{S}|
+    \label{eq:smagorinsky}
+\end{equation}
+\begin{itemize}
+    \item $C_s$: Smagorinsky sabiti (öğrenilebilir)
+    \item $\bar{\Delta} = (\Delta x \cdot \Delta y \cdot \Delta z)^{1/3}$: filtre genişliği (grid boyutlarından hesaplanır)
+    \item $|\tensor{S}| = \sqrt{2 S_{ij} S_{ij}}$: strain rate büyüklüğü
+    \item $S_{ij} = \frac{1}{2}\left(\pd{u_i}{x_j} + \pd{u_j}{x_i}\right)$: strain rate tensörü
+\end{itemize}
+
+\textbf{Neden kritik?} $96 \times 160 \times 64$ gridi, $\Rey = 10\,000$'de tüm ölçekleri çözecek incelikte değildir. Grid analizi LES skorunu $74/100$ olarak belirlemiştir: makul ama DNS değil. EddyViscosity kapalıyken, çözülemeyen modlara enerji birikir ve 63 saatlik eğitimde görüldüğü gibi patlama (NaN) meydana gelir.
+
+\textbf{Öğrenilebilir parametre:}
+\begin{itemize}
+    \item \texttt{cs\_value} $(C_s)$: başlangıç $= 0.15$, klamplama: $[0.05, 0.30]$.
+\end{itemize}
+Klasik Smagorinsky'de $C_s \approx 0.17$ (izotropik türbülans için). INNATE'in bunu öğrenmesine izin verilir: mixed convection'da kanal akışı ve plume yapıları birlikte bulunduğundan, optimal $C_s$ homojen türbülanstan sapabilir.
+
+
+% --- 4. Projection3D ---
+\subsection{Projection3D: Süreklilik Zorlaması}
+\label{sec:projection_noron}
+
+\textbf{Fiziksel anlam:} Sıkıştırılamaz akışta $\divergence \vect{u} = 0$ koşulunu zorlar.
+
+\textbf{Matematiksel form (Helmholtz ayrıştırması):}
+
+Herhangi bir hız alanı $\vect{u}^*$ (henüz divergence-free olmayan), şöyle ayrıştırılır:
+\begin{equation}
+    \vect{u}^* = \vect{u} + \gradient \phi
+    \label{eq:helmholtz}
+\end{equation}
+Burada $\vect{u}$ solenodial ($\divergence \vect{u} = 0$) ve $\gradient \phi$ irrotasyonel kısımdır. Sürekliliği zorlamak için:
+\begin{enumerate}
+    \item Poisson denklemi çözülür:
+    \begin{equation}
+        \laplacian \phi = \divergence \vect{u}^*
+        \label{eq:poisson}
+    \end{equation}
+    \item Hız düzeltilir:
+    \begin{equation}
+        \vect{u} = \vect{u}^* - s_p \cdot \gradient \phi
+        \label{eq:projection_correction}
+    \end{equation}
+\end{enumerate}
+
+\textbf{Spektral çözüm:} Periyodik domain'de Poisson denklemi Fourier uzayında tek bir bölme işlemine dönüşür:
+\begin{equation}
+    \hat{\phi}(\vect{k}) = \frac{\widehat{\divergence \vect{u}^*}(\vect{k})}{-|\vect{k}|^2}, \quad |\vect{k}| \neq 0; \qquad \hat{\phi}(\vect{0}) = 0
+    \label{eq:poisson_spectral}
+\end{equation}
+Sıfır modu ($\vect{k} = \vect{0}$) ortalama basınca karşılık gelir ve periyodik domain'de belirsizdir; sıfıra sabitlenir.
+
+\textbf{Öğrenilebilir parametre:}
+\begin{itemize}
+    \item \texttt{pressure\_scale} $(s_p)$: başlangıç $= 1.0$, klamplama: $[0.8, 1.2]$.
+\end{itemize}
+$s_p = 1$ tam Projection demektir. Model bunu hafifçe ayarlayarak, unrolled time-stepping'de basınç düzeltmesinin ``şiddetini'' optimize edebilir.
+
+
+% --- 5. Forcing3D ---
+\subsection{Forcing3D: Dış Kuvvet}
+\label{sec:forcing_noron}
+
+\textbf{Fiziksel anlam:} Kolmogorov body forcing ile rüzgâr etkisi.
+
+\textbf{Matematiksel form:}
+\begin{equation}
+    \mathcal{F}(y) = A \sin\!\left(\frac{k_f \cdot 2\pi y}{L_y}\right) \hat{\vect{e}}_x
+    \label{eq:forcing_neuron}
+\end{equation}
+
+\textbf{Öğrenilebilir parametre:}
+\begin{itemize}
+    \item \texttt{amplitude} $(A)$: başlangıç $= 1.0$, klamplama: $[0.01, 10.0]$.
+\end{itemize}
+$A$'nın büyüklüğü, enerji enjeksiyon oranını ($\varepsilon_{\text{in}} = \langle \vect{u} \cdot \vect{F} \rangle$) kontrol eder. Eğitim sırasında model, enerji dengesini sağlayacak $A$'yı öğrenir.
+
+
+% --- 6. Buoyancy3D ---
+\subsection{Buoyancy3D: Kaldırma Kuvveti}
+\label{sec:buoyancy_noron}
+
+\textbf{Fiziksel anlam:} Sıcaklık pertürbasyonunun dikey momentuma etkisi.
+
+\textbf{Matematiksel form:}
+\begin{equation}
+    \mathcal{B}(T') = \beta_{\text{eff}} \cdot \Rich \cdot T' \cdot \hat{\vect{e}}_y
+    \label{eq:buoyancy_neuron}
+\end{equation}
+
+Yalnızca $v$-denklemine katılır. $T' > 0$ (ortalamadan sıcak) olan bölgelerde yukarı kuvvet, $T' < 0$ olan bölgelerde aşağı kuvvet oluşturur.
+
+\textbf{Öğrenilebilir parametre:}
+\begin{itemize}
+    \item \texttt{buoyancy\_strength} $(\beta_{\text{eff}})$: başlangıç $= 1.0$, klamplama: $[0.0, 50.0]$.
+\end{itemize}
+
+
+% --- 7. ThermalAdvection3D ---
+\subsection{ThermalAdvection3D: Sıcaklık Adveksiyonu}
+\label{sec:thermal_adv_noron}
+
+\textbf{Fiziksel anlam:} Hız alanının sıcaklık pertürbasyonunu taşıması.
+
+\textbf{Matematiksel form:}
+\begin{equation}
+    \mathcal{T}_{\text{adv}}(\vect{u}, T') = -(\vect{u} \cdot \gradient)T' = -\left(u\pd{T'}{x} + v\pd{T'}{y} + w\pd{T'}{z}\right)
+    \label{eq:thermal_adv_neuron}
+\end{equation}
+
+Hesaplama, Advection3D'nin skaler versiyonudur: türevler spektral, çarpımlar fiziksel uzayda, dealiasing uygulanır.
+
+
+% --- 8. ThermalDiffusion3D ---
+\subsection{ThermalDiffusion3D: Sıcaklık Difüzyonu}
+\label{sec:thermal_diff_noron}
+
+\textbf{Fiziksel anlam:} Moleküler iletimle sıcaklığın yayılması.
+
+\textbf{Matematiksel form:}
+\begin{equation}
+    \mathcal{T}_{\text{diff}}(T') = \frac{\kappa_{\text{scale}}}{\Rey \, \Pran} \laplacian T'
+    \label{eq:thermal_diff_neuron}
+\end{equation}
+
+\textbf{Öğrenilebilir parametre:}
+\begin{itemize}
+    \item \texttt{kappa\_scale} $(\kappa_{\text{scale}})$: başlangıç $= 1.0$, klamplama: $[0.1, 5.0]$.
+\end{itemize}
+$\kappa_{\text{scale}} > 1$ etkin termal difuziviteyi artırır, yani çözülemeyen küçük ölçekli termal yapıların difuzif etkisini modeller.
+
+
+% ============================================================
+\section{Parametre Tablosu}
+\label{sec:parametre_tablosu}
+
+\begin{table}[H]
+\centering
+\caption{INNATE nöron parametreleri özeti.}
+\label{tab:neuron_params}
+\begin{tabular}{@{}llccc@{}}
+\toprule
+\textbf{Nöron} & \textbf{Parametre} & \textbf{Init} & \textbf{Min} & \textbf{Max} \\
+\midrule
+Advection3D        & \texttt{advection\_modulator}  & $1.0$  & $0.5$  & $2.0$ \\
+Diffusion          & \texttt{diffusion\_scale}      & $1.0$  & $0.1$  & $3.0$ \\
+EddyViscosity3D    & \texttt{cs\_value}             & $0.15$ & $0.05$ & $0.30$ \\
+Projection3D       & \texttt{pressure\_scale}       & $1.0$  & $0.8$  & $1.2$ \\
+Forcing3D          & \texttt{amplitude}             & $1.0$  & $0.01$ & $10.0$ \\
+Buoyancy3D         & \texttt{buoyancy\_strength}    & $1.0$  & $0.0$  & $50.0$ \\
+ThermalAdvection3D & (parametresiz)                 & ---    & ---    & --- \\
+ThermalDiffusion3D & \texttt{kappa\_scale}          & $1.0$  & $0.1$  & $5.0$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{remark}
+Başlangıç değerleri, nöronların \textit{tam fizik} (\textit{yani DNS benzeri}) davranışına karşılık gelecek şekilde seçilmiştir. $\alpha_{\text{adv}} = 1$, $\nu_{\text{scale}} = 1$, $\beta_{\text{eff}} = 1$ demek, denklemlerin hiçbir modifikasyon olmadan çözülmesi anlamına gelir. Eğitim, bu değerleri grid çözünürlüğüne ve LES etkilerine göre ince ayarlar.
+\end{remark}
+
+
+% ============================================================
+\section{SpectralOps3DAniso: Spektral Operatörler}
+\label{sec:spectral_ops}
+
+Tüm nöronların türev hesapları, ortak bir spektral operatörler sınıfı üzerinden yapılır: \texttt{SpectralOps3DAniso}.
+
+\subsection{Neden Anizotropik?}
+
+Domain boyutları eşit değildir ($6 \times 10 \times 4$). Dolayısıyla her yöndeki dalga sayıları farklıdır:
+\begin{equation}
+    k_x = \frac{2\pi n_x}{L_x}, \quad
+    k_y = \frac{2\pi n_y}{L_y}, \quad
+    k_z = \frac{2\pi n_z}{L_z}
+    \label{eq:aniso_wavenumbers}
+\end{equation}
+$n_x \in [0, N_x/2]$, $n_y \in [0, N_y/2]$, $n_z \in [0, N_z/2]$ tamsayı mod indeksleridir. Farklı $L_i$ değerleri, aynı mod indeksinin farklı fiziksel dalga sayılarına karşılık gelmesine neden olur.
+
+\subsection{Temel Operatörler}
+
+\begin{description}
+    \item[\texttt{gradient($\hat{f}$)}:] Skaler alanın gradyanı:
+    $\widehat{\partial f / \partial x_j} = i k_j \hat{f}$.
+
+    \item[\texttt{laplacian($\hat{f}$)}:] Skaler/vektörel Laplacian:
+    $\widehat{\laplacian f} = -(k_x^2 + k_y^2 + k_z^2) \hat{f}$.
+
+    \item[\texttt{curl($\hat{\vect{u}}$)}:] Vortisite:
+    $\hat{\omega}_i = i \epsilon_{ijk} k_j \hat{u}_k$ (Levi-Civita sembolü ile).
+
+    \item[\texttt{divergence($\hat{\vect{u}}$)}:] $\widehat{\divergence \vect{u}} = i(k_x \hat{u} + k_y \hat{v} + k_z \hat{w})$.
+
+    \item[\texttt{dealias($\hat{f}$)}:] Yüksek modları sıfırla. Mode-index bazlı: $|n_x| > N_x/3$, $|n_y| > N_y/3$ veya $|n_z| > N_z/3$ olan modlar kaldırılır.
+
+    \item[\texttt{solve\_poisson($\hat{f}$)}:] Poisson denklemi:
+    $\hat{\phi} = \hat{f} / (-|\vect{k}|^2)$, $\hat{\phi}(\vect{0}) = 0$.
+\end{description}
+
+\subsection{Dealiasing: Mode-Index ve Fiziksel $k$}
+
+\"Onemli bir ayrım: Dealiasing işleminde \textit{mode-index} bazlı filtreleme kullanılır, \textit{fiziksel dalga sayısı büyüklüğü} ($|\vect{k}|$) bazlı değil. Nedeni: anizotropik domain'de aynı fiziksel $k$ değeri, farklı yönlerde farklı mod indekslerine karşılık gelir. Mode-index bazlı kural, FFT'nin ürettiği dizin yapısıyla doğrudan uyumludur.
+
+
+% ============================================================
+\section{Forward Pass Akışı}
+\label{sec:forward_pass}
+
+Bir zaman adımının INNATE içindeki akışı:
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{innate_architecture.png}
+\caption{INNATE forward pass akış diyagramı. Her kutu bir fizik nöronunu, yanındaki sayılar öğrenilebilir parametre sayısını gösterir. Akış: momentum $\to$ termal $\to$ projeksiyon $\to$ zaman entegrasyonu.}
+\label{fig:innate_architecture}
+\end{figure}
+
+\subsection{State Yapısı}
+
+Giriş ve çıkış: \texttt{FluidState3D} --- hız bileşenleri ($u, v, w$), basınç ($p$) ve sıcaklık pertürbasyonu ($T'$).
+
+\subsection{Bir Zaman Adımının Akışı}
+
+\begin{enumerate}
+    \item \textbf{Momentum RHS hesabı:}
+    \begin{enumerate}
+        \item Advection3D: $\vect{R}_{\text{adv}} = -\alpha_{\text{adv}} \cdot (\vect{u} \cdot \gradient)\vect{u}$
+        \item Diffusion: $\vect{R}_{\text{diff}} = (\nu_{\text{scale}} / \Rey) \, \laplacian \vect{u}$
+        \item EddyViscosity3D: $\vect{R}_{\text{eddy}} = \divergence(\nu_t \gradient \vect{u})$
+        \item Forcing3D: $\vect{R}_{\text{force}} = A \sin(k_f \cdot 2\pi y / L_y) \, \hat{\vect{e}}_x$
+        \item Buoyancy3D: $\vect{R}_{\text{buoy}} = \beta_{\text{eff}} \cdot \Rich \cdot T' \, \hat{\vect{e}}_y$
+    \end{enumerate}
+    Toplam: $\vect{R}_u = \vect{R}_{\text{adv}} + \vect{R}_{\text{diff}} + \vect{R}_{\text{eddy}} + \vect{R}_{\text{force}} + \vect{R}_{\text{buoy}}$
+
+    \item \textbf{Sıcaklık RHS hesabı:}
+    \begin{enumerate}
+        \item ThermalAdvection3D: $R_{T,\text{adv}} = -(\vect{u} \cdot \gradient)T'$
+        \item ThermalDiffusion3D: $R_{T,\text{diff}} = (\kappa_{\text{scale}} / \Rey\Pran) \, \laplacian T'$
+        \item Kaynak terim: $R_{T,\text{src}} = v \cdot \Delta T / L_y$
+    \end{enumerate}
+    Toplam: $R_T = R_{T,\text{adv}} + R_{T,\text{diff}} + R_{T,\text{src}}$
+
+    \item \textbf{Zaman entegrasyonu (TimeMarcher3D):}
+    RK4 (4. derece Runge--Kutta) şeması:
+    \begin{align}
+        \vect{k}_1 &= \vect{R}(\vect{q}^n) \\
+        \vect{k}_2 &= \vect{R}\!\left(\vect{q}^n + \tfrac{\Delta t}{2} \vect{k}_1\right) \\
+        \vect{k}_3 &= \vect{R}\!\left(\vect{q}^n + \tfrac{\Delta t}{2} \vect{k}_2\right) \\
+        \vect{k}_4 &= \vect{R}(\vect{q}^n + \Delta t \, \vect{k}_3) \\
+        \vect{q}^{n+1} &= \vect{q}^n + \frac{\Delta t}{6}(\vect{k}_1 + 2\vect{k}_2 + 2\vect{k}_3 + \vect{k}_4)
+    \end{align}
+    Burada $\vect{q} = (u, v, w, T')$ tüm state değişkenlerini temsil eder.
+
+    \item \textbf{Projection (div=0 zorlaması):}
+    RK4 sonrasında elde edilen $\vect{u}^*$'a Projection3D uygulanır:
+    \[
+        \laplacian \phi = \divergence \vect{u}^*, \quad
+        \vect{u}^{n+1} = \vect{u}^* - s_p \cdot \gradient \phi
+    \]
+
+    \item \textbf{Gauge fix:} $T' \leftarrow T' - \langle T' \rangle$.
+
+    \item \textbf{Çıkış:} \texttt{FluidState3D}$(u^{n+1}, v^{n+1}, w^{n+1}, p^{n+1}, T'^{n+1})$.
+\end{enumerate}
+
+\begin{remark}
+1 zaman adımı = 1 ağ katmanı. 20 adımlık unrolled eğitim $=$ 20 katmanlı bir ağdan geçiş. Geri yayılım (backpropagation), bu 20 katmandan geriye doğru gradient hesaplar.
+\end{remark}
+
+
+% ============================================================
+\section{Yol C: Lokal-Adaptif Parametreler}
+\label{sec:yol_c}
+
+Temel INNATE'te her nöron \textit{tek global skaler} parametre kullanır: $\alpha_{\text{adv}}$ her yerde aynıdır. Bu, türbülant akışta yetersiz kalabilir, çünkü lokal koşullar (plume bölgesi vs.\ shear bölgesi) çok farklıdır.
+
+\subsection{Lokal \"{I}nvariantlar}
+
+Her grid noktasında, akış alanından doğrudan hesaplanabilen altı skaler büyüklük:
+\begin{equation}
+\begin{aligned}
+    I_1 &= |\tensor{S}| = \sqrt{2 S_{ij} S_{ij}} && \text{(strain rate büyüklüğü)} \\
+    I_2 &= |\vect{\omega}| = \sqrt{\omega_i \omega_i} && \text{(vortisite büyüklüğü)} \\
+    I_3 &= Q = \frac{|\vect{\omega}|^2 - |\tensor{S}|^2}{2} && \text{($Q$-kriteri: girdap tanımlama)} \\
+    I_4 &= |\gradient T'| && \text{(sıcaklık gradyanı)} \\
+    I_5 &= E_{\text{local}} = \tfrac{1}{2}(u^2 + v^2 + w^2) && \text{(lokal kinetik enerji)} \\
+    I_6 &= T' && \text{(sıcaklık pertürbasyonu)}
+\end{aligned}
+\label{eq:invariants}
+\end{equation}
+
+Bu büyüklükler, FFT türevlerinden hesaplanır ve otomatik türev (backprop) ile gradient akışını destekler.
+
+\subsection{Adaptif Parametre Formülü}
+
+Global skaler yerine, parametreler her noktada invariantlardan hesaplanır:
+
+\textbf{Lineer versiyon:}
+\begin{equation}
+    \alpha_{\text{eff}}(\vect{x}) = \alpha_0 + \sum_{m=1}^{6} \alpha_m \, \hat{I}_m(\vect{x})
+    \label{eq:linear_modulation}
+\end{equation}
+7 öğrenilebilir parametre per operatör per katman. $\hat{I}_m$ normalize edilmiş invariantlardır:
+\begin{equation}
+    \hat{I}_m = \frac{I_m}{\max(I_{m,\text{global}}, \, \varepsilon)}
+    \label{eq:invariant_normalization}
+\end{equation}
+Normalizasyon olmadan invariantlar çok farklı ölçeklerdedir ($|S| \sim \mathcal{O}(100)$, $T' \sim \mathcal{O}(0.01)$) ve eğitim kararsızlaşır.
+
+\textbf{Kuadratik versiyon:}
+\begin{equation}
+    \alpha_{\text{eff}} = \alpha_0
+    + \sum_{m=1}^{6} \alpha_m \hat{I}_m
+    + \sum_{m=1}^{3} \alpha_{6+m} \hat{I}_m^2
+    + \alpha_{10} \hat{I}_1 \hat{I}_2
+    + \alpha_{11} \hat{I}_1 \hat{I}_3
+    + \alpha_{12} \hat{I}_2 \hat{I}_3
+    \label{eq:quadratic_modulation}
+\end{equation}
+13 parametre per operatör per katman. Çapraz terimler ($\hat{I}_1 \hat{I}_2$ gibi), strain-vorticity etkileşimini yakalar.
+
+\textbf{Pozitiflik zorlaması (difüziviteler için):}
+\begin{equation}
+    \nu_{\text{eff}}(\vect{x}) = \text{softplus}\!\left(\nu_0 + \sum_m \nu_m \hat{I}_m + \ldots\right)
+    \label{eq:softplus_constraint}
+\end{equation}
+Softplus: $\text{softplus}(x) = \ln(1 + e^x)$, her zaman $> 0$.
+
+\subsection{Blok Yapısı}
+
+Yol C mimarisinde, 20--25 katman 3--4 bloğa gruplandırılır. Her blokta:
+\begin{enumerate}
+    \item FFT ile türevler ve invariantlar hesaplanır (blok başında bir kez).
+    \item 5--7 katmanda RHS hesabı yapılır (sadece pointwise çarpım ve toplam; FFT yok).
+    \item Projection ile $\divergence \vect{u} = 0$ zorlanır.
+\end{enumerate}
+
+\subsection{Parametre Bütçesi}
+
+\begin{table}[H]
+\centering
+\caption{Yol C parametre tahmini (kuadratik versiyon, 4 blok $\times$ 5 katman = 20 katman).}
+\label{tab:yol_c_params}
+\begin{tabular}{@{}lc@{}}
+\toprule
+\textbf{Bileşen} & \textbf{Parametre Sayısı} \\
+\midrule
+5 operatör $\times$ 4 bileşen $(u,v,w,T')$ $\times$ 13 param $\times$ 20 katman & 5,200 \\
+EddyViscosity $C_s$ & 1 \\
+$\Delta t$ per katman & 20 \\
+\midrule
+\textbf{Toplam} & $\sim$5,221 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Bu $\sim$5K parametre, bir FNO'nun $\sim$10$^6$ parametresinin $\sim$200 katı altındadır; ancak her parametrenin fiziksel anlamı vardır ve lokal adaptasyon yoluyla $983{,}040$ grid noktasında farklı etkin değerler üretir.
+
+
+% ============================================================
+\section{Bölüm Özeti}
+\label{sec:mimari_ozet}
+
+\begin{itemize}
+    \item INNATE, NS denklemlerinin her terimini bir nöron olarak kodlar.
+    \item 8 nöron tipi: Advection3D, Diffusion, EddyViscosity3D, Projection3D, Forcing3D, Buoyancy3D, ThermalAdvection3D, ThermalDiffusion3D.
+    \item Her nöronün 0--2 öğrenilebilir parametresi var; hepsi fiziksel anlamlaştırılabilir.
+    \item SpectralOps3DAniso, anizotropik domain için türev/Poisson/dealiasing sağlar.
+    \item Forward pass: RHS hesabı $\to$ RK4 integrasyon $\to$ Projection $\to$ gauge fix.
+    \item Yol C ile parametreler lokal invariantlara bağlanarak uzamsal adaptasyon elde edilir.
+    \item Toplam $\sim$5--10K parametre, tamamı yorumlanabilir.
+\end{itemize}
+
+Sonraki bölümde (Bölüm~\ref{ch:training}), bu parametrelerin nasıl öğrenildiğini --- loss fonksiyonları, curriculum learning ve eğitim stratejisini --- inceleyeceğiz.

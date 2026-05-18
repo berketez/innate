@@ -1,0 +1,372 @@
+\chapter{Boussinesq Yaklaşımı ve Konveksiyon}
+\label{ch:boussinesq}
+
+% ============================================================
+\section{Boussinesq Yaklaşımı Nedir?}
+\label{sec:boussinesq_nedir}
+
+Gerçek akışkanlarda sıcaklık değişimi yoğunluğu değiştirir. Sıcak hava hafifler, soğuk hava ağırlaşır. Tam sıkıştırılabilir denklemler bu etkiyi eksiksiz yakalar, ama çözümü çok pahalıdır (ses dalgalarını da çözmek gerekir).
+
+Joseph Valentin Boussinesq (1903), basit ama güçlü bir yaklaşım önerdi:
+
+\begin{definition}[Boussinesq Yaklaşımı]
+Yoğunluk değişimi \textbf{yalnızca kaldırma (buoyancy) teriminde} hesaba katılır. Diğer tüm terimlerde yoğunluk sabit ($\rho_0$) alınır.
+\end{definition}
+
+Başka bir deyişle:
+\begin{itemize}
+    \item Süreklilik denkleminde: $\divergence\vect{u} = 0$ (sanki sıkıştırılamaz).
+    \item Momentum denkleminde: Atalet terimi $\rho_0\,D\vect{u}/Dt$, viskoz terim $\mu\laplacian\vect{u}$ --- $\rho = \rho_0$ kullanılır.
+    \item \textbf{Tek istisna:} Yerçekimi terimi $\rho\vect{g}$'de gerçek yoğunluk $\rho(T)$ kullanılır.
+\end{itemize}
+
+Bu ``tutarsız'' gibi görünebilir, ama fiziksel olarak gerekçelidir: yoğunluk değişimi küçüktür ($\Delta\rho/\rho_0 \ll 1$), atalet ve viskoz terimlerde ihmal edilebilir. Ama yerçekimi kuvveti $\rho g$ büyük bir sayıdır; küçük bir $\Delta\rho$ bile önemli bir kaldırma kuvveti yaratır.
+
+
+% ============================================================
+\section{Boussinesq Denklemlerinin Türetmesi}
+\label{sec:boussinesq_turetme}
+
+\textbf{Adım 1: Durum denklemi (lineer yaklaşım).}
+
+Yoğunluğun sıcaklığa bağımlılığını birinci mertebe Taylor açılımıyla yazalım:
+\begin{equation}
+    \rho(T) = \rho_0 + \left.\pd{\rho}{T}\right|_{T_0} (T - T_0) + \mathcal{O}\bigl((T-T_0)^2\bigr)
+    \label{eq:rho_taylor}
+\end{equation}
+
+Termal genleşme katsayısı tanımı:
+\begin{equation}
+    \beta \equiv -\frac{1}{\rho_0}\left.\pd{\rho}{T}\right|_{T_0}
+    \label{eq:beta_def}
+\end{equation}
+
+Eksi işareti konvansiyondur: çoğu akışkanda sıcaklık arttıkça yoğunluk \textit{azalır}, yani $\partial\rho/\partial T < 0$; böylece $\beta > 0$ olur.
+
+Denklem~\eqref{eq:rho_taylor}'ye yerleştirelim:
+\begin{equation}
+    \rho(T) = \rho_0\bigl[1 - \beta(T - T_0)\bigr]
+    \label{eq:boussinesq_eos}
+\end{equation}
+
+\begin{example}
+Hava için $\beta \approx 1/T_0$ (ideal gaz). $T_0 = 300$~K'de $\beta = 1/300 \approx 3.33 \times 10^{-3}$~K$^{-1}$.
+\begin{itemize}
+    \item $\Delta T = 20$~K: $\beta\Delta T = 0.067 \ll 1$ $\checkmark$ (Boussinesq geçerli)
+    \item $\Delta T = 50$~K: $\beta\Delta T = 0.167$ (sınırda)
+    \item $\Delta T = 200$~K: $\beta\Delta T = 0.667$ (Boussinesq geçersiz!)
+\end{itemize}
+\end{example}
+
+\textbf{Adım 2: Momentum denklemine yerleştirme.}
+
+Tam (sıkıştırılabilir) momentum denklemi:
+\begin{equation}
+    \rho\DDt{\vect{u}} = -\gradient p + \mu\laplacian\vect{u} + \rho\vect{g} + \vect{F}
+\end{equation}
+
+Sol taraftaki $\rho$'yu Boussinesq'e göre $\rho_0$ ile değiştirin (çünkü $\Delta\rho/\rho_0 \ll 1$):
+\begin{equation}
+    \rho_0\DDt{\vect{u}} = -\gradient p + \mu\laplacian\vect{u} + \rho(T)\,\vect{g} + \vect{F}
+\end{equation}
+
+\textbf{Adım 3: Yerçekimi teriminin işlenmesi.}
+
+$\rho(T)\vect{g}$ terimini açalım. $\vect{g} = -g\,\hat{\vect{e}}_y$ (aşağı yönde):
+\begin{equation}
+    \rho(T)\,\vect{g} = \rho_0[1 - \beta(T-T_0)](-g\,\hat{\vect{e}}_y) = -\rho_0 g\,\hat{\vect{e}}_y + \rho_0 g\beta(T-T_0)\hat{\vect{e}}_y
+\end{equation}
+
+İlk terim ($-\rho_0 g\hat{\vect{e}}_y$) hidrostatik basınçla dengelenir. \textit{Değiştirilmiş basınç} tanımlayalım:
+\begin{equation}
+    p' = p + \rho_0 g\,y
+    \label{eq:modified_pressure}
+\end{equation}
+
+O zaman $-\gradient p - \rho_0 g\,\hat{\vect{e}}_y = -\gradient p'$ olur.
+
+\textbf{Adım 4: Boussinesq momentum denklemi.}
+
+\begin{equation}
+    \rho_0\DDt{\vect{u}} = -\gradient p' + \mu\laplacian\vect{u} + \rho_0 g\beta(T - T_{\text{ref}})\hat{\vect{e}}_y + \vect{F}
+\end{equation}
+
+$\rho_0$'a bölersek:
+\begin{equation}
+    \boxed{\pd{\vect{u}}{t} + (\vect{u}\cdot\gradient)\vect{u} = -\frac{1}{\rho_0}\gradient p' + \nu\laplacian\vect{u} + g\beta(T - T_{\text{ref}})\hat{\vect{e}}_y + \frac{\vect{F}}{\rho_0}}
+    \label{eq:boussinesq_momentum}
+\end{equation}
+
+\textbf{Kaldırma terimi} $g\beta(T - T_{\text{ref}})\hat{\vect{e}}_y$'nin yapısına dikkat edin:
+\begin{itemize}
+    \item $T > T_{\text{ref}}$: Akışkan sıcak $\to$ kuvvet yukarı ($+y$) $\to$ yükselir.
+    \item $T < T_{\text{ref}}$: Akışkan soğuk $\to$ kuvvet aşağı ($-y$) $\to$ alçalır.
+    \item $T = T_{\text{ref}}$: Kaldırma yok.
+\end{itemize}
+
+\textbf{Adım 5: Tam Boussinesq sistemi.}
+
+Enerji denklemi değişmez (zaten $\rho = \rho_0$ ile türetildi):
+\begin{subequations}
+\label{eq:boussinesq_system}
+\begin{align}
+    \pd{\vect{u}}{t} + (\vect{u}\cdot\gradient)\vect{u} &= -\frac{1}{\rho_0}\gradient p' + \nu\laplacian\vect{u} + g\beta(T - T_{\text{ref}})\hat{\vect{e}}_y + \frac{\vect{F}}{\rho_0} \label{eq:bouss_mom} \\
+    \pd{T}{t} + (\vect{u}\cdot\gradient)T &= \kappa\laplacian T \label{eq:bouss_ene} \\
+    \divergence\vect{u} &= 0 \label{eq:bouss_cont}
+\end{align}
+\end{subequations}
+
+\begin{remark}
+Boussinesq'te $\divergence\vect{u} = 0$ \textbf{kesindir}. Bu denklem bir ``yaklaşım'' değildir: yoğunluk etkisi \textbf{yalnızca} $g\beta(T-T_{\text{ref}})$ teriminde yer alır. Süreklilik denklemi ``sanki sıkıştırılamaz'' gibidir. Bu, sayısal çözüm için büyük kolaylıktır çünkü basınç Poisson denklemiyle hesaplanabilir.
+\end{remark}
+
+
+% ============================================================
+\section{Rayleigh--B\'{e}nard Konveksiyonu}
+\label{sec:rayleigh_benard}
+
+\subsection{Problem Tanımı}
+
+Rayleigh--Bénard (RB) konveksiyonu, doğal konveksiyonun en temel ve en çok çalışılan modelidir:
+
+\begin{itemize}
+    \item Yatay iki plaka arasında akışkan.
+    \item Alt plaka sıcak ($T_h$), üst plaka soğuk ($T_c$).
+    \item Yerçekimi aşağı yönde.
+    \item Dış zorlama yok ($\vect{F} = 0$, $U = 0$).
+\end{itemize}
+
+Tek kontrol parametresi $\Ray$ (ve $\Pran$).
+
+\subsection{Lineer Stabilite Analizi}
+
+Hidrostatik denge (akışkan hareketsiz) çözümü:
+\begin{equation}
+    \vect{u}_0 = 0, \qquad T_0(y) = T_h - \frac{\Delta T}{H}\,y, \qquad p_0(y) = p_{\text{atm}} + \rho_0 g (H-y)
+    \label{eq:hydrostatic}
+\end{equation}
+
+Bu çözüm her zaman vardır. Soru şu: bu denge \textit{kararlı} mı?
+
+Küçük bir pertürbasyon ekleyelim:
+\begin{equation}
+    \vect{u} = \vect{u}_0 + \vect{u}' = \vect{u}', \qquad T = T_0 + T', \qquad p = p_0 + p'
+\end{equation}
+
+Boussinesq denklemlerine yerleştirip $\mathcal{O}({\vect{u}'}^2)$ terimlerini ihmal edelim (lineerizasyon):
+\begin{subequations}
+\begin{align}
+    \pd{\vect{u}'}{t} &= -\frac{1}{\rho_0}\gradient p' + \nu\laplacian\vect{u}' + g\beta\,T'\hat{\vect{e}}_y \label{eq:perturb_mom} \\
+    \pd{T'}{t} - \frac{\Delta T}{H}v' &= \kappa\laplacian T' \label{eq:perturb_ene} \\
+    \divergence\vect{u}' &= 0 \label{eq:perturb_cont}
+\end{align}
+\end{subequations}
+
+Denklem~\eqref{eq:perturb_ene}'deki $-(\Delta T/H)v'$ terimi kilit terimdir: dikey hız pertürbasyonu $v'$ temel sıcaklık gradyanıyla etkileşerek sıcaklık pertürbasyonu üretir.
+
+Normal mod analizi ($\vect{u}', T', p' \propto e^{\sigma t + i(k_x x + k_z z)}$) uygulanır ve $y$ yönünde uygun sınır koşulları ile bir \textbf{özdeğer problemi} elde edilir.
+
+\subsection{Kritik Rayleigh Sayısı}
+
+Lineer stabilite analizi sonucu:
+\begin{equation}
+    \boxed{\Ray_{\text{cr}} = \frac{27}{4}\pi^4 \approx 657.5 \quad \text{(free-slip)}}
+    \label{eq:ra_cr_freeslip}
+\end{equation}
+\begin{equation}
+    \boxed{\Ray_{\text{cr}} = 1707.76 \approx 1708 \quad \text{(no-slip)}}
+    \label{eq:ra_cr_noslip}
+\end{equation}
+
+\begin{itemize}
+    \item $\Ray < \Ray_{\text{cr}}$: Tüm pertürbasyonlar söner ($\sigma < 0$). Akışkan hareketsiz, $T$ doğrusal profilde kalır. Isı yalnızca iletimle taşınır: $\Nus = 1$.
+    \item $\Ray = \Ray_{\text{cr}}$: Nötr kararlılık ($\sigma = 0$). Sonlu genlikli konveksiyon hücreleri oluşmaya başlar.
+    \item $\Ray > \Ray_{\text{cr}}$: Pertürbasyonlar büyür ($\sigma > 0$). Konveksiyon başlar.
+\end{itemize}
+
+\subsection{Konveksiyon Yapıları}
+
+$\Ray$ arttıkça akış yapıları zenginleşir:
+
+\begin{enumerate}
+    \item $\Ray \gtrsim \Ray_{\text{cr}}$: \textbf{Düzenli konveksiyon hücreleri.} 2B'de ``rolls'' (silindirler), 3B'de altıgen Bénard hücreleri. Sıcak akışkan yükselir, soğuyan akışkan alçalır.
+
+    \item $\Ray \sim 10^4$--$10^5$: Hücreler kararsızlaşır. Zaman bağımlı davranış. Osilatörler, periyot-ikilemeleri.
+
+    \item $\Ray \gtrsim 10^6$: \textbf{Türbülant konveksiyon.} Büyük ölçekli sirkulasyon (LSC) + türbülant plume'lar. Alt sınır tabakasından sıcak plume'lar kopup yükselir; üst sınır tabakasından soğuk plume'lar düşer.
+
+    \item $\Ray \gtrsim 10^{10}$--$10^{14}$: ``Ultimate'' rejim tartışması. Sınır tabakaları kendileri türbülant mı oluyor? Açık araştırma sorusu.
+\end{enumerate}
+
+
+% ============================================================
+\section{Zorlanmış Konveksiyon}
+\label{sec:forced_convection}
+
+Zorlanmış konveksiyonda akışkan hareketi dış kuvvetle sağlanır ve kaldırma kuvveti ihmal edilebilir ($\Rich \ll 1$).
+
+Bu durumda sıcaklık denklemi \textbf{pasif skaler} gibi davranır:
+\begin{subequations}
+\begin{align}
+    \pd{\vect{u}}{t} + (\vect{u}\cdot\gradient)\vect{u} &= -\frac{1}{\rho_0}\gradient p + \nu\laplacian\vect{u} + \frac{\vect{F}}{\rho_0} \\
+    \pd{T}{t} + (\vect{u}\cdot\gradient)T &= \kappa\laplacian T \\
+    \divergence\vect{u} &= 0
+\end{align}
+\end{subequations}
+
+Dikkat: Momentum denkleminde $T$ yok. Hız alanı sıcaklıktan bağımsız çözülür; sonra sıcaklık dağılımı bilinen $\vect{u}$ ile bulunur. Bu tek yönlü bağlantıdır ve çözümü kolaylaştırır.
+
+\subsection{Kolmogorov Forcing}
+
+Bu projede kullanılan rüzgâr etkisi, \textbf{Kolmogorov forcing} ile modellenmiştir:
+\begin{equation}
+    \vect{F} = A\,\sin\!\left(k_f\,\frac{2\pi y}{L_y}\right)\hat{\vect{e}}_x
+    \label{eq:kolmogorov_forcing}
+\end{equation}
+
+Burada:
+\begin{itemize}
+    \item $A$: Forcing genliği [m/s$^2$]
+    \item $k_f$: Forcing dalga sayısı (genellikle $k_f = 1$)
+    \item Kuvvet yalnızca $x$ yönünde ve $y$'ye sinüzoidal bağımlı
+\end{itemize}
+
+Neden bu forcing?
+\begin{enumerate}
+    \item \textbf{Analitik laminar çözüm vardır:} $u_{\text{lam}}(y) \propto \sin(k_f y)$. Bu, validasyon için kullanılabilir.
+    \item \textbf{Enerji enjeksiyonu kontrollüdür:} Tek bir dalga sayısında enerji pompalanır, enerji kaskadı temiz çalışır.
+    \item \textbf{Periyodik sınır koşullarıyla uyumludur:} $\sin$ fonksiyonu doğal olarak periyodiktir.
+\end{enumerate}
+
+
+% ============================================================
+\section{Mixed Convection}
+\label{sec:mixed_convection}
+
+Mixed convection, zorlanmış ve doğal konveksiyonun \textit{birlikte} etkili olduğu rejimdir. $\Rich \sim \mathcal{O}(1)$ olduğunda ne kaldırma kuvveti ne de dış zorlama ihmal edilebilir.
+
+\subsection{Fiziksel Yapılar}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{convection_types.png}
+\caption{Üç konveksiyon rejimi: (sol) doğal konveksiyon ($\Rich \gg 1$, dikey plume'lar), (orta) zorlanmış konveksiyon ($\Rich \ll 1$, yatay akış), (sağ) mixed convection ($\Rich \sim 1$, eğik plume'lar ve karmaşık yapılar).}
+\label{fig:convection_types}
+\end{figure}
+
+Mixed convection'da karmaşık akış yapıları ortaya çıkar:
+
+\begin{enumerate}
+    \item \textbf{Eğik plume'lar (tilted plumes):} Doğal konveksiyonda plume'lar dikey yükselir. Yatay rüzgâr onları yatırır. Plume açısı $\sim \arctan(\Rich^{1/2})$ ile ölçeklenir.
+
+    \item \textbf{Kesilmiş konveksiyon hücreleri (sheared cells):} Bénard hücreleri rüzgâr tarafından deforme edilir. Rüzgâr yönünde uzar, dikey yönde sıkışır.
+
+    \item \textbf{Büyük ölçekli sirkulasyon (LSC) + rüzgâr etkileşimi:} Doğal konveksiyonun yarattığı LSC ile dış akış etkileşir. Aynı yönde iseler güçlenir, ters yönde iseler zayıflar veya salınır.
+
+    \item \textbf{Rejim geçişleri:} Parametre uzayında keskin olmayan geçişler. Küçük $\Delta\Ray$ değişimi akış yapısını tamamen değiştirebilir (histerezis mümkün).
+\end{enumerate}
+
+\subsection{Neden Zor?}
+
+Mixed convection modellemesi zordur çünkü:
+\begin{enumerate}
+    \item \textbf{İki yönlü bağlantı:} Hız $\leftrightarrow$ sıcaklık. Bağımsız çözülemez.
+    \item \textbf{Çoklu zaman ölçekleri:} Advektif zaman ölçeği $H/U$ ve kaldırma zaman ölçeği $H/\sqrt{g\beta\Delta T H}$ farklı olabilir.
+    \item \textbf{Çoklu uzunluk ölçekleri:} Hız sınır tabakası, sıcaklık sınır tabakası, plume kalınlığı, forcing dalga boyu\ldots
+    \item \textbf{3B etkileri güçlü:} 2B modeller yanıltıcı olabilir (spanwise instability, 3B plume etkileşimleri).
+\end{enumerate}
+
+\subsection{Literatürdeki Durum}
+
+\begin{itemize}
+    \item 2B RB konveksiyonu DNS ile kapsamlı çalışılmıştır ($\Ray$ = $10^6$--$10^{15}$).
+    \item 3B RB konveksiyonu DNS ile $\Ray \lesssim 10^{10}$ kadar çalışılmıştır.
+    \item Mixed convection (RB + forced) 2B'de sınırlı çalışma var.
+    \item \textbf{3B mixed convection + neural operator: neredeyse çalışılmamış.} Bu, projemizin orijinal katkısıdır.
+\end{itemize}
+
+
+% ============================================================
+\section{Non-Boussinesq Etkileri}
+\label{sec:non_boussinesq}
+
+\subsection{Boussinesq'in Sınırları}
+
+Boussinesq yaklaşımı $\beta\Delta T \ll 1$ koşulunda geçerlidir. Bu koşul bozulduğunda:
+
+\begin{enumerate}
+    \item \textbf{Yoğunluk asimetrisi:} Sıcak ve soğuk plume'lar farklı davranır. Soğuk akışkan daha ağırdır, daha hızlı düşer. Sıcak akışkan daha hafiftir, daha yavaş yükselir. Bu asimetri Boussinesq'te yoktur.
+
+    \item \textbf{Viskozite değişimi:} Gerçek akışkanlarda viskozite sıcaklıkla değişir. Hava için $\mu \propto T^{0.7}$. Bu da asimetriye katkıda bulunur.
+
+    \item \textbf{Sıkıştırılamazlık bozulması:} $\divergence\vect{u} \neq 0$ olur. Stratifiye akışlarda bu önemli olabilir.
+\end{enumerate}
+
+\subsection{Ne Zaman Gerekir?}
+
+\begin{center}
+\begin{tabular}{rcl}
+\toprule
+$\beta\Delta T$ & \textbf{Durum} & \textbf{Yaklaşım} \\
+\midrule
+$< 0.1$ & Güvenli & Boussinesq yeterli \\
+$0.1$--$0.2$ & Sınırda & Dikkatli değerlendirme gerekli \\
+$> 0.2$ & Tehlikeli & Non-Boussinesq veya sıkıştırılabilir \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{example}
+Hava ($\beta = 1/T_0 = 1/300$~K$^{-1}$) için:
+\begin{itemize}
+    \item $\Delta T = 20$~K: $\beta\Delta T = 0.067$ $\to$ Boussinesq güvenle geçerli.
+    \item $\Delta T = 50$~K: $\beta\Delta T = 0.167$ $\to$ Sınırda. Non-Boussinesq etkileri görülebilir.
+    \item $\Delta T = 100$~K: $\beta\Delta T = 0.333$ $\to$ Boussinesq yetersiz.
+\end{itemize}
+Bu projede $\Delta T = 20$~K civarında çalışıyoruz, dolayısıyla Boussinesq geçerlidir.
+\end{example}
+
+\subsection{Non-Boussinesq Denklemler}
+
+Tam non-Boussinesq formülasyon, yoğunluğu sıcaklığın fonksiyonu olarak tutar:
+\begin{equation}
+    \rho = \frac{\rho_0 T_0}{T} \quad \text{(ideal gaz)}
+    \label{eq:non_bouss_eos}
+\end{equation}
+
+Bu durumda süreklilik denklemi:
+\begin{equation}
+    \pd{\rho}{t} + \divergence(\rho\vect{u}) = 0 \quad \text{ve genel olarak} \quad \divergence\vect{u} \neq 0
+\end{equation}
+
+Ancak düşük Mach sayısı ($\mathrm{Ma} \ll 1$) koşulunda ``low-Mach yaklaşımı'' kullanılabilir:
+\begin{itemize}
+    \item Akustik dalgalar filtrelenir (ses hızı $\to \infty$).
+    \item Basınç, termodinamik ($p_0$) ve dinamik ($p'$) kısımlara ayrılır.
+    \item $p_0$ uzayda sabit (kapalı kap) veya zamanda sabit (açık akış).
+    \item Süreklilik denklemi: $\divergence\vect{u} = -(1/T)\,DT/Dt$ (sıfır değil!).
+\end{itemize}
+
+Non-Boussinesq modelleme, bu projenin ileri aşamasında (Boussinesq çalıştıktan sonra) bir genişletme hedefi olarak düşünülmektedir. INNATE mimarisine non-Boussinesq nöronları eklemek prensipte mümkündür.
+
+
+% ============================================================
+\section{Bölüm Özeti}
+\label{sec:boussinesq_ozet}
+
+\begin{enumerate}
+    \item \textbf{Boussinesq yaklaşımı:} Yoğunluk değişimi yalnızca kaldırma teriminde. Geçerlilik: $\beta\Delta T \ll 1$.
+
+    \item \textbf{Boussinesq denklemleri:}
+    \begin{align*}
+        \pd{\vect{u}}{t} + (\vect{u}\cdot\gradient)\vect{u} &= -\frac{1}{\rho_0}\gradient p + \nu\laplacian\vect{u} + g\beta(T-T_{\text{ref}})\hat{\vect{e}}_y + \frac{\vect{F}}{\rho_0} \\
+        \pd{T}{t} + (\vect{u}\cdot\gradient)T &= \kappa\laplacian T \\
+        \divergence\vect{u} &= 0
+    \end{align*}
+
+    \item \textbf{Rayleigh--Bénard:} Alttan ısıtma, üstten soğutma. $\Ray_{\text{cr}} \approx 1708$ (no-slip). $\Ray > \Ray_{\text{cr}}$ $\to$ konveksiyon.
+
+    \item \textbf{Mixed convection:} Zorlanmış + doğal birlikte. $\Rich \sim \mathcal{O}(1)$. En karmaşık rejim.
+
+    \item \textbf{Bu projede:} Boussinesq + Kolmogorov forcing + RB ısıtma $\to$ 3B mixed convection. $\Rey = 1000$--$10{,}000$, $\Ray = 10^5$--$10^7$, $\Pran = 0.71$.
+\end{enumerate}

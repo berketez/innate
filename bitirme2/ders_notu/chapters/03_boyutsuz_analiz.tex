@@ -1,0 +1,436 @@
+\chapter{Boyutsuz Analiz}
+\label{ch:boyutsuz}
+
+% ============================================================
+\section{Boyutsuzlaştırma Nedir ve Neden Yapılır?}
+\label{sec:boyutsuz_neden}
+
+Fiziksel denklemlerde her terim birim taşır: metre, saniye, Kelvin\ldots{} Boyutsuzlaştırma, tüm değişkenleri karakteristik ölçeklere bölerek birimsiz hale getirir. Neden?
+
+\begin{enumerate}
+    \item \textbf{Evrensellik:} 10~cm'lik laboratuvar modeli ile 10~m'lik gerçek yapı, aynı boyutsuz sayılara sahipse \textit{aynı fiziği} gösterir. Bu, benzerlik (similitude) ilkesidir.
+
+    \item \textbf{Parametre sayısının azaltılması:} Boyutlu denklemlerde $\rho_0$, $\mu$, $k$, $c_p$, $g$, $\beta$, $H$, $U$, $\Delta T$ gibi çok sayıda parametre vardır. Boyutsuzlaştırma bunları birkaç boyutsuz sayıya ($\Rey$, $\Ray$, $\Pran$) indirir.
+
+    \item \textbf{Baskın mekanizmayı belirleme:} Boyutsuz sayılar, farklı fiziksel etkilerin göreceli büyüklüklerini doğrudan gösterir. $\Rey = 10^4$ demek ``atalet kuvvetleri visköz kuvvetlerden $10^4$ kat büyük'' demektir.
+
+    \item \textbf{Sayısal stabilite:} Değişkenlerin $\mathcal{O}(1)$ mertebesinde olması, sayısal çözücülerde yuvarlatma hatalarını azaltır.
+\end{enumerate}
+
+
+\section{Buckingham $\pi$ Teoremi}
+\label{sec:buckingham}
+
+Boyutsuz analizin temeli Buckingham $\pi$ teoremidir:
+
+\begin{theorem}[Buckingham $\pi$ Teoremi]
+Bir fiziksel problem $n$ adet boyutlu değişken ve $k$ adet temel birim (kütle, uzunluk, zaman, sıcaklık) içeriyorsa, problem en çok $n - k$ adet bağımsız boyutsuz $\pi$ grubu ile ifade edilebilir.
+\end{theorem}
+
+\begin{example}
+Bizim mixed convection problemimizde ilgili değişkenler:
+\[
+\rho_0, \; \mu, \; k, \; c_p, \; g, \; \beta, \; H, \; U, \; \Delta T
+\]
+$n = 9$ değişken, $k = 4$ temel birim (M, L, T, $\Theta$). Beklenen boyutsuz sayı adedi: $9 - 4 = 5$.
+
+Bunlar: $\Rey$, $\Ray$ (veya $\Rich$), $\Pran$, $\Nus$ ve bir geometrik oran ($L_x/H$ gibi). Tam olarak ihtiyacımız olan sayılar.
+\end{example}
+
+
+% ============================================================
+\section{Boyutsuzlaştırma Procedürü}
+\label{sec:boyutsuzlastirma}
+
+\subsection{Adım 1: Referans Büyüklüklerin Seçimi}
+
+Karakteristik (referans) değerleri seçiyoruz:
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Büyüklük} & \textbf{Referans} & \textbf{Açıklama} \\
+\midrule
+Uzunluk & $L_{\text{ref}} = H$ & Kanal yüksekliği \\
+Hız & $U_{\text{ref}} = U$ & Karakteristik hız (forcing'den) \\
+Zaman & $t_{\text{ref}} = H/U$ & Advektif zaman ölçeği \\
+Basınç & $p_{\text{ref}} = \rho_0 U^2$ & Dinamik basınç \\
+Sıcaklık & $\Delta T = T_h - T_c$ & Sıcaklık farkı \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Adım 2: Boyutsuz Değişkenlerin Tanımı}
+
+Yıldız ($^*$) ile boyutsuz değişkenleri belirtiriz:
+\begin{equation}
+    \vect{x}^* = \frac{\vect{x}}{H}, \quad
+    \vect{u}^* = \frac{\vect{u}}{U}, \quad
+    t^* = \frac{t\,U}{H}, \quad
+    p^* = \frac{p}{\rho_0 U^2}, \quad
+    T^* = \frac{T - T_c}{T_h - T_c}
+    \label{eq:nondim_vars}
+\end{equation}
+
+Not: $T^*$'ın tanımında $T_c$ referans olarak çıkartılıyor, böylece $T^* \in [0, 1]$ (alt yüzeyde $T^* = 1$, üst yüzeyde $T^* = 0$).
+
+\subsection{Adım 3: Türevlerin Dönüştürülmesi}
+
+Zincir kuralı ile:
+\begin{equation}
+    \pd{}{x} = \pd{}{(H\,x^*)}\cdot\pd{(H\,x^*)}{x} = \frac{1}{H}\pd{}{x^*}
+    \quad \Rightarrow \quad
+    \gradient = \frac{1}{H}\,\gradient^*
+    \label{eq:grad_transform}
+\end{equation}
+
+\begin{equation}
+    \pd{}{t} = \pd{}{(H\,t^*/U)} = \frac{U}{H}\pd{}{t^*}
+    \label{eq:time_transform}
+\end{equation}
+
+\begin{equation}
+    \laplacian = \frac{1}{H^2}\,{\laplacian}^*
+    \label{eq:laplacian_transform}
+\end{equation}
+
+\subsection{Adım 4: Momentum Denkleminin Boyutsuzlaştırılması}
+
+Boyutlu momentum denklemi (denklem~\ref{eq:navier_stokes}):
+\begin{equation}
+    \pd{\vect{u}}{t} + (\vect{u}\cdot\gradient)\vect{u} = -\frac{1}{\rho_0}\gradient p + \nu\,\laplacian\vect{u} + g\beta(T - T_{\text{ref}})\,\hat{\vect{e}}_y + \frac{\vect{F}}{\rho_0}
+\end{equation}
+
+Her terimi boyutsuz değişkenlerle yazalım:
+
+\textbf{Yerel ivme:}
+\begin{equation}
+    \pd{\vect{u}}{t} = \pd{(U\vect{u}^*)}{(H t^*/U)} = \frac{U^2}{H}\pd{\vect{u}^*}{t^*}
+\end{equation}
+
+\textbf{Konvektif ivme:}
+\begin{equation}
+    (\vect{u}\cdot\gradient)\vect{u} = (U\vect{u}^*\cdot\frac{1}{H}\gradient^*)(U\vect{u}^*) = \frac{U^2}{H}(\vect{u}^*\cdot\gradient^*)\vect{u}^*
+\end{equation}
+
+\textbf{Basınç gradyanı:}
+\begin{equation}
+    -\frac{1}{\rho_0}\gradient p = -\frac{1}{\rho_0}\cdot\frac{1}{H}\gradient^*(\rho_0 U^2 p^*) = -\frac{U^2}{H}\gradient^* p^*
+\end{equation}
+
+\textbf{Visköz terim:}
+\begin{equation}
+    \nu\,\laplacian\vect{u} = \nu \cdot \frac{1}{H^2}{\laplacian}^*(U\vect{u}^*) = \frac{\nu U}{H^2}{\laplacian}^*\vect{u}^*
+\end{equation}
+
+\textbf{Kaldırma (buoyancy) terimi:}
+\begin{equation}
+    g\beta(T-T_c)\,\hat{\vect{e}}_y = g\beta\,\Delta T\,T^*\,\hat{\vect{e}}_y
+\end{equation}
+
+\textbf{Dış zorlama:}
+\begin{equation}
+    \frac{\vect{F}}{\rho_0} = \frac{U^2}{H}\,\vect{F}^*
+\end{equation}
+burada $\vect{F}^* = \vect{F}\,H/(\rho_0 U^2)$ boyutsuz forcing.
+
+\textbf{Hepsini birleştirelim:}
+\begin{equation}
+    \frac{U^2}{H}\left[\pd{\vect{u}^*}{t^*} + (\vect{u}^*\cdot\gradient^*)\vect{u}^*\right]
+    = -\frac{U^2}{H}\gradient^* p^* + \frac{\nu U}{H^2}{\laplacian}^*\vect{u}^* + g\beta\Delta T\,T^*\hat{\vect{e}}_y + \frac{U^2}{H}\vect{F}^*
+\end{equation}
+
+Her iki tarafı $U^2/H$ ile bölelim:
+\begin{equation}
+    \pd{\vect{u}^*}{t^*} + (\vect{u}^*\cdot\gradient^*)\vect{u}^* = -\gradient^* p^* + \frac{\nu}{UH}{\laplacian}^*\vect{u}^* + \frac{g\beta\Delta T\,H}{U^2}\,T^*\hat{\vect{e}}_y + \vect{F}^*
+\end{equation}
+
+Şimdi boyutsuz sayıları tanıyalım:
+\begin{equation}
+    \frac{\nu}{UH} = \frac{1}{\Rey}, \qquad \frac{g\beta\Delta T\,H}{U^2} = \Rich
+\end{equation}
+
+Sonuç:
+\begin{equation}
+    \boxed{\pd{\vect{u}^*}{t^*} + (\vect{u}^*\cdot\gradient^*)\vect{u}^* = -\gradient^* p^* + \frac{1}{\Rey}{\laplacian}^*\vect{u}^* + \Rich\,T^*\hat{\vect{e}}_y + \vect{F}^*}
+    \label{eq:nondim_momentum}
+\end{equation}
+
+\subsection{Adım 5: Enerji Denkleminin Boyutsuzlaştırılması}
+
+Boyutlu enerji denklemi (denklem~\ref{eq:energy}):
+\begin{equation}
+    \pd{T}{t} + (\vect{u}\cdot\gradient)T = \kappa\,\laplacian T
+\end{equation}
+
+Boyutsuz değişkenlerle:
+\begin{equation}
+    \frac{U\,\Delta T}{H}\pd{T^*}{t^*} + \frac{U\,\Delta T}{H}(\vect{u}^*\cdot\gradient^*)T^* = \frac{\kappa\,\Delta T}{H^2}{\laplacian}^* T^*
+\end{equation}
+
+$U\,\Delta T/H$ ile bölelim:
+\begin{equation}
+    \pd{T^*}{t^*} + (\vect{u}^*\cdot\gradient^*)T^* = \frac{\kappa}{UH}{\laplacian}^* T^*
+\end{equation}
+
+Katsayıyı tanıyalım:
+\begin{equation}
+    \frac{\kappa}{UH} = \frac{\nu}{UH}\cdot\frac{\kappa}{\nu} = \frac{1}{\Rey}\cdot\frac{1}{\Pran} = \frac{1}{\Rey\,\Pran}
+\end{equation}
+
+Sonuç:
+\begin{equation}
+    \boxed{\pd{T^*}{t^*} + (\vect{u}^*\cdot\gradient^*)T^* = \frac{1}{\Rey\,\Pran}{\laplacian}^* T^*}
+    \label{eq:nondim_energy}
+\end{equation}
+
+\subsection{Adım 6: Boyutsuz Süreklilik}
+
+Süreklilik denklemi zaten boyutsuz:
+\begin{equation}
+    \divergence^*\vect{u}^* = 0
+    \label{eq:nondim_continuity}
+\end{equation}
+
+
+% ============================================================
+\section{Boyutsuz Sayılar ve Fiziksel Anlamları}
+\label{sec:boyutsuz_sayilar}
+
+\subsection{Reynolds Sayısı ($\Rey$)}
+\label{subsec:reynolds}
+
+\begin{equation}
+    \boxed{\Rey = \frac{UH}{\nu} = \frac{\text{Atalet kuvveti}}{\text{Visköz kuvvet}}}
+    \label{eq:reynolds}
+\end{equation}
+
+\textbf{Türetme:} Momentum denkleminde:
+\begin{itemize}
+    \item Atalet terimi: $(\vect{u}\cdot\gradient)\vect{u} \sim U^2/H$
+    \item Visköz terim: $\nu\laplacian\vect{u} \sim \nu U/H^2$
+    \item Oran: $\frac{U^2/H}{\nu U/H^2} = \frac{UH}{\nu} = \Rey$
+\end{itemize}
+
+\textbf{Fiziksel anlam:}
+\begin{itemize}
+    \item $\Rey \ll 1$: Visköz kuvvetler baskın. Akış düzenli (laminar), öngörülebilir. Örnek: bal akışı.
+    \item $\Rey \sim 1$: Kuvvetler dengede.
+    \item $\Rey \gg 1$: Atalet kuvvetleri baskın. Akış kaotik, düzensiz (türbülant). Örnek: uçak kanadı etrafındaki akış.
+\end{itemize}
+
+\begin{center}
+\begin{tabular}{rll}
+\toprule
+$\Rey$ & \textbf{Rejim} & \textbf{Örnek} \\
+\midrule
+$< 1$ & Stokes akışı & Bakteri, mikro-akışkanlar \\
+$\sim 100$ & Laminar & Boru akışı (düşük hız) \\
+$\sim 2{,}300$ & Geçiş (boru) & Boru akışı (kritik) \\
+$1{,}000$ & Laminar-geçiş & Bu proje (alt sınır) \\
+$10{,}000$ & Türbülant & Bu proje (üst sınır) \\
+$10^6$ & Gelişmiş türbülans & Uçak, gemi \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+
+\subsection{Rayleigh Sayısı ($\Ray$)}
+\label{subsec:rayleigh}
+
+\begin{equation}
+    \boxed{\Ray = \frac{g\,\beta\,\Delta T\,H^3}{\nu\,\kappa} = \frac{\text{Kaldırma kuvveti} \times \text{Zaman ölçeği}}{\text{Sönüm kuvvetleri}}}
+    \label{eq:rayleigh}
+\end{equation}
+
+\textbf{Türetme:} Kaldırma kuvveti $\sim g\beta\Delta T$ (birim kütle başına), visköz sönüm $\sim \nu/H^2$ (momentum difüzyonu için zaman ölçegi $H^2/\nu$), termal sönüm $\sim \kappa/H^2$:
+\begin{equation}
+    \Ray = \frac{g\beta\Delta T}{(\nu/H^2)(\kappa/H^2) \cdot H} = \frac{g\beta\Delta T \cdot H^3}{\nu\kappa}
+\end{equation}
+
+Alternatif yorum: $\Ray$ = (kaldırma tarafından sürülen konveksiyon hızı) / (difüzyonla sönümleme hızı).
+
+\textbf{Fiziksel anlam:}
+\begin{itemize}
+    \item $\Ray < \Ray_{\text{cr}} \approx 1708$: Sıcaklık farkı yeterince büyük değil; akışkan hareketsiz, ısı sadece iletimle taşınır. Sıcaklık profili doğrusaldır.
+    \item $\Ray > \Ray_{\text{cr}}$: Konveksiyon başlar. Düzenli konveksiyon hücreleri (B\'{e}nard hücreleri) oluşur.
+    \item $\Ray \gtrsim 10^5$: Konveksiyon güçlenir, hücreler bozulmaya başlar.
+    \item $\Ray \gtrsim 10^8$: Türbülant konveksiyon. Kaotik plume yapıları.
+\end{itemize}
+
+Kritik Rayleigh sayısının değeri sınır koşullarına bağlıdır:
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Sınır Koşulu} & $\Ray_{\text{cr}}$ \\
+\midrule
+Üst-alt rigid (no-slip) & 1708 \\
+Üst-alt free-slip & 657.5 \\
+Rigid alt, free üst & 1101 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+
+\subsection{Prandtl Sayısı ($\Pran$)}
+\label{subsec:prandtl}
+
+\begin{equation}
+    \boxed{\Pran = \frac{\nu}{\kappa} = \frac{\text{Momentum difüzivitesi}}{\text{Termal difüzivite}}}
+    \label{eq:prandtl}
+\end{equation}
+
+Prandtl sayısı tamamen \textbf{malzeme özelliği}dür; akış koşullarına bağlı değildir.
+
+\textbf{Fiziksel anlam:} Hız ve sıcaklık sınır tabakalarının göreceli kalınlıklarını belirler.
+\begin{itemize}
+    \item $\Pran \ll 1$: Termal difüzivite baskın. Sıcaklık sınır tabakası kalın, hız sınır tabakası ince. Örnek: sıvı metaller ($\Pran \sim 0.01$).
+    \item $\Pran \sim 1$: Her iki sınır tabakası benzer kalınlıkta. Örnek: gazlar.
+    \item $\Pran \gg 1$: Momentum difüzivitesi baskın. Hız sınır tabakası kalın, sıcaklık sınır tabakası ince. Örnek: yağlar.
+\end{itemize}
+
+\begin{center}
+\begin{tabular}{lrl}
+\toprule
+\textbf{Akışkan} & $\Pran$ & \textbf{Not} \\
+\midrule
+Sıvı sodyum & 0.01 & Nükleer reaktör soğutucusu \\
+Cıva & 0.025 & Sıvı metal \\
+Hava (20$^\circ$C) & 0.71 & \textbf{Bu projede kullanılan} \\
+Su (20$^\circ$C) & 7.0 & Isı değiştirici \\
+Motor yağı & $\sim 1000$ & Çok visköz \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+
+\subsection{Richardson Sayısı ($\Rich$)}
+\label{subsec:richardson}
+
+\begin{equation}
+    \boxed{\Rich = \frac{g\,\beta\,\Delta T\,H}{U^2} = \frac{\Ray}{\Rey^2\,\Pran} = \frac{\text{Kaldırma kuvveti}}{\text{Atalet kuvveti}}}
+    \label{eq:richardson}
+\end{equation}
+
+\textbf{Türetme:}
+\begin{align}
+    \frac{\Ray}{\Rey^2 \Pran} &= \frac{g\beta\Delta T H^3/(\nu\kappa)}{(UH/\nu)^2 \cdot (\nu/\kappa)} \nonumber \\
+    &= \frac{g\beta\Delta T H^3}{\nu\kappa} \cdot \frac{\nu^2}{U^2 H^2} \cdot \frac{\kappa}{\nu} \nonumber \\
+    &= \frac{g\beta\Delta T H^3 \cdot \nu^2 \cdot \kappa}{\nu\kappa \cdot U^2 H^2 \cdot \nu} = \frac{g\beta\Delta T H}{U^2} = \Rich \quad \checkmark
+\end{align}
+
+Richardson sayısı, mixed convection'ın \textbf{anahtar parametresi}dir. Konveksiyon rejimini doğrudan belirler:
+
+\begin{equation}
+    \Rich = \frac{\text{Kaldırma kuvveti (ölçeği: } g\beta\Delta T)}{\text{Atalet kuvveti (ölçeği: } U^2/H)}
+\end{equation}
+
+\textbf{Rejim sınıflandırması:}
+\begin{center}
+\begin{tabular}{rcl}
+\toprule
+$\Rich$ & \textbf{Rejim} & \textbf{Açıklama} \\
+\midrule
+$\Rich \gg 1$ & Doğal konveksiyon & Kaldırma baskın, dış akış ihmal edilebilir \\
+$\Rich \sim \mathcal{O}(1)$ & \textbf{Mixed convection} & Her iki etki önemli \\
+$\Rich \ll 1$ & Zorlanmış konveksiyon & Dış akış baskın, $T$ pasif skaler \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{example}
+Bu projedeki parametre uzayında Richardson sayısı:
+\begin{itemize}
+    \item $\Rey = 1000$, $\Ray = 10^4$, $\Pran = 0.71$: \; $\Rich = 10^4/(10^6 \times 0.71) \approx 0.014$ (zorlanmış)
+    \item $\Rey = 1000$, $\Ray = 10^8$, $\Pran = 0.71$: \; $\Rich = 10^8/(10^6 \times 0.71) \approx 141$ (doğal)
+    \item $\Rey = 5000$, $\Ray = 10^7$, $\Pran = 0.71$: \; $\Rich = 10^7/(2.5\times10^7 \times 0.71) \approx 0.56$ (\textbf{mixed!})
+\end{itemize}
+Mixed convection rejimi ($\Rich \sim 0.1$--$10$) bu proje için hedef bölgedir.
+\end{example}
+
+
+\subsection{Nusselt Sayısı ($\Nus$)}
+\label{subsec:nusselt}
+
+\begin{equation}
+    \boxed{\Nus = \frac{h\,H}{k} = \frac{\text{Toplam ısı transferi}}{\text{Saf iletim ısı transferi}}}
+    \label{eq:nusselt}
+\end{equation}
+
+Burada $h$ konvektif ısı transfer katsayısı [W/(m$^2\cdot$K)], $k$ ısıl iletkenlik.
+
+\textbf{Pratik hesaplama:} Nusselt sayısı, duvar yüzeyindeki sıcaklık gradyanından hesaplanır:
+\begin{equation}
+    \Nus = -\frac{H}{\Delta T}\left\langle\pd{T}{y}\right\rangle_{y=0}
+    \label{eq:nusselt_gradient}
+\end{equation}
+Burada $\langle\cdot\rangle$ yatay ortalamadır. Eksi işareti, gradyanın negatif olmasından gelir (sıcaklık yukarı doğru azalır).
+
+\textbf{Fiziksel anlam:}
+\begin{itemize}
+    \item $\Nus = 1$: Akışkan hareketsiz, ısı sadece iletimle taşınır. $T$ profili doğrusaldır.
+    \item $\Nus > 1$: Konveksiyon ısı transferini artırır. $\Nus = 10$ demek ``konveksiyon, saf iletimden 10 kat fazla ısı taşıyor'' demektir.
+    \item Türbülant rejimde klasik ölçekleme: $\Nus \sim \Ray^{1/3}$ (yüksek $\Ray$).
+\end{itemize}
+
+\begin{center}
+\begin{tabular}{rl}
+\toprule
+$\Ray$ & $\Nus$ (yaklaşık) \\
+\midrule
+$< 1708$ & 1 (saf iletim) \\
+$10^4$ & $\sim 3$ \\
+$10^6$ & $\sim 10$ \\
+$10^8$ & $\sim 30$ \\
+$10^{10}$ & $\sim 100$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Nusselt sayısı, INNATE modelinin en önemli validasyon metriklerinden biridir. Fiziksel olarak anlamlı bir simülasyonda $\Nus \geq 1$ olmalıdır; $\Nus = 1$ ise model konveksiyonu öğrenememiş demektir.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{nusselt_vs_ra.png}
+\caption{Nusselt sayısının Rayleigh sayısına bağlılığı. $\Ray < 1708$'de saf iletim ($\Nus = 1$), üstünde konveksiyonla birlikte $\Nus \sim \Ray^{1/3}$. Bizim parametre aralığımız vurgulanmıştır.}
+\label{fig:nusselt_vs_ra}
+\end{figure}
+
+% ============================================================
+\section{Rejim Haritası}
+\label{sec:rejim_haritasi}
+
+Boyutsuz sayıların kombinasyonu, akış rejimini belirler. Aşağıdaki şema, $\Rey$--$\Ray$ düzleminde konveksiyon rejimlerini gösterir:
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{regime_map.png}
+    \caption{Konveksiyon rejim haritası. Eğri çizgi $\Rich = 1$ sınırını gösterir. Bu sınırın üstünde kaldırma kuvveti baskın (doğal konveksiyon), altında dış kuvvet baskın (zorlanmış konveksiyon). Aradaki bölge mixed convection'dır.}
+    \label{fig:regime_map}
+\end{figure}
+
+$\Rich = 1$ eğrisini bulmak için $\Ray/(\Rey^2\Pran) = 1$ denkleminden:
+\begin{equation}
+    \Ray = \Pran\,\Rey^2
+\end{equation}
+
+Hava için ($\Pran = 0.71$): $\Ray_{\text{sınır}} = 0.71\,\Rey^2$. Örneğin $\Rey = 5000$ için $\Ray_{\text{sınır}} \approx 1.78 \times 10^7$.
+
+
+% ============================================================
+\section{Boyutsuz Denklem Sisteminin Özeti}
+\label{sec:boyutsuz_ozet}
+
+Yıldızları düşürelim (bundan sonra tüm değişkenler boyutsuz):
+
+\begin{subequations}
+\label{eq:nondim_system}
+\begin{align}
+    \pd{\vect{u}}{t} + (\vect{u}\cdot\gradient)\vect{u} &= -\gradient p + \frac{1}{\Rey}\laplacian\vect{u} + \Rich\,T\,\hat{\vect{e}}_y + \vect{F} \label{eq:nondim_mom_final} \\
+    \pd{T}{t} + (\vect{u}\cdot\gradient)T &= \frac{1}{\Rey\,\Pran}\laplacian T \label{eq:nondim_ene_final} \\
+    \divergence\vect{u} &= 0 \label{eq:nondim_cont_final}
+\end{align}
+\end{subequations}
+
+Bu sistem 3 boyutsuz parametre ile tamamen tanımlanır: $\Rey$, $\Ray$ (veya $\Rich$), $\Pran$.
+
+Bir sonraki bölümde, kaldırma teriminin ($\Rich\,T\,\hat{\vect{e}}_y$) nasıl Boussinesq yaklaşımından türediğini, bu yaklaşımın geçerlilik koşullarını ve konveksiyon türlerini detaylı inceleyeceğiz.

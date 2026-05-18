@@ -1,0 +1,801 @@
+% =============================================================================
+% Section 5: Termal Deneme ve Basarisizlik Analizi
+% INNATE Bitirme Tezi -- Berke Tezgocen
+% =============================================================================
+
+\section{Termal Deneme ve Basarisizlik Analizi}
+\label{sec:thermal-failure}
+
+Bu bolumde, INNATE modelinin izothermal (saf momentum) basarisinin ardindan
+gerceklestirilen mixed convection genisletme denemesi detayli olarak
+incelenmektedir. Termal deneme, bilimsel arastirma surecinin kacinilmaz bir
+parcasi olan ``basarisiz deney'' kategorisinde yer almakla birlikte, elde
+edilen bulgular modelin yapisal sinirlarini aydinlatmasi bakimindan en az
+basarili sonuclar kadar degerli bilgi icermektedir. Sirasiyla motivasyon,
+mimari genisletme, egitim surecinde karsilasilan sorunlar, kok neden analizi,
+karsilastirmali perspektif ve alinan dersler ele alinmaktadir.
+
+
+% =============================================================================
+\subsection{Motivasyon ve Hedef}
+\label{sec:thermal-motivation}
+
+INNATE'in izothermal modda $\text{Re} = 7{,}000$ ve $\text{Re} = 10{,}000$'de
+basarili sonuclar uretmesinin ardindan, dogal bir sonraki adim olarak
+\emph{mixed convection} --- yani momentum ve isi transferinin birlesik
+simulasyonu --- hedeflenmistir. Mixed convection, muhendislik uygulamalarinin
+buyuk cogunlugunda (bina havalandirmasi, elektronik sogutma, atmosferik sinir
+tabakasi) gecerli olan fiziksel rejimdir ve salt izothermal sonuclar bu
+uygulamalara dogrudan aktarilamaz.
+
+Mixed convection fizigin matematiksel cercevesi, Navier-Stokes denklemlerine
+Boussinesq yaklasimi ile eklenen kaldirim kuvveti (buoyancy) ve enerji denklemi
+uzerinden tanimlanir. Boyutsuz formulasyonda momentum denklemi:
+
+\begin{equation}
+  \frac{\partial \mathbf{u}}{\partial t}
+  + (\mathbf{u} \cdot \nabla)\mathbf{u}
+  = -\nabla p
+  + \frac{1}{\text{Re}}\nabla^2 \mathbf{u}
+  + \text{Ri}\,\theta\,\hat{\mathbf{e}}_y
+  + \mathbf{F}
+  \label{eq:momentum-boussinesq}
+\end{equation}
+
+\noindent burada $\text{Ri} = \text{Ra}/(\text{Re}^2 \cdot \text{Pr})$
+Richardson sayisi, $\theta = (T - T_\text{ref})/\Delta T$ boyutsuz sicaklik
+perturbasyonu ve $\hat{\mathbf{e}}_y$ yercekimi yonundeki birim vektordur.
+Enerji (sicaklik) denklemi ise:
+
+\begin{equation}
+  \frac{\partial \theta}{\partial t}
+  + (\mathbf{u} \cdot \nabla)\theta
+  = \frac{1}{\text{Re}\cdot\text{Pr}}\nabla^2 \theta
+  + v \cdot \frac{1}{L_y}
+  \label{eq:energy-boussinesq}
+\end{equation}
+
+\noindent burada son terim ($v/L_y$), periyodik kutudaki ortalama sicaklik
+gradyaninin baglantisidir (duvar sinir kosulu yoksa ``mean gradient'' kaynak
+terimi).
+
+Hedef buyuklukler su sekilde tanimlanmistir:
+
+\begin{itemize}
+  \item \textbf{Nusselt sayisi} ($\text{Nu}$): Konvektif isi transferinin
+        iletimsel transfere orani.
+        \begin{equation}
+          \text{Nu} = 1 + \frac{\langle v\theta \rangle}{\kappa \cdot (1/L_y)}
+          \label{eq:nusselt-def}
+        \end{equation}
+  \item \textbf{Termal flux} ($\langle v\theta \rangle$): Dikey hiz-sicaklik
+        korelasyonu, turbulansi isi tasiminin dogrudan olcusu.
+  \item \textbf{Sicaklik RMS} ($\theta_\text{rms}$): Sicaklik alaninin
+        degiskenlik siddetini olcer.
+        \begin{equation}
+          \theta_\text{rms} = \sqrt{\langle \theta^2 \rangle}
+          \label{eq:theta-rms-def}
+        \end{equation}
+\end{itemize}
+
+LES (Large Eddy Simulation) referans degerleri Tablo~\ref{tab:les-thermal-ref}
+ile verilmektedir.
+
+\begin{table}[H]
+  \centering
+  \caption{LES referans termal metrikleri ($\text{Ra} = 10^5$, $\text{Pr} = 0.71$,
+           $96 \times 160 \times 64$ grid, 60{,}000 adim).}
+  \label{tab:les-thermal-ref}
+  \begin{tabular}{lcccc}
+    \toprule
+    $\text{Re}$ & $\text{Nu}$ & $\langle v\theta \rangle$ & $\theta_\text{rms}$ & TKE \\
+    \midrule
+    7{,}000  & 39.3  & $7.71 \times 10^{-4}$ & 0.0240 & 0.00848 \\
+    10{,}000 & 70.5  & $9.78 \times 10^{-4}$ & 0.0268 & 0.00731 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+
+% =============================================================================
+\subsection{Termal Mimari Genisletme}
+\label{sec:thermal-architecture}
+
+INNATE'in 20 katmanli fractional-step mimarisine termal operatorler eklenerek
+toplam parametre sayisi 167'den 287'ye cikarilmistir. Eklenen termal
+``noronlar'' (ogrenilebilir fizik operatorleri) ve parametre dagilimi
+Tablo~\ref{tab:thermal-params} ile ozetlenmektedir.
+
+\begin{table}[H]
+  \centering
+  \caption{INNATE termal parametreleri (120 adet, toplam 287'nin \%42'si).}
+  \label{tab:thermal-params}
+  \begin{tabular}{llcl}
+    \toprule
+    Operator & Parametre & Sayi & Aciklama \\
+    \midrule
+    ThermalAdvection3D & \texttt{thermal\_adv\_modulator} & $20$ & Sicaklik adveksiyonu modulasyonu \\
+    ThermalDiffusion3D & \texttt{kappa\_scale\_x/y/z} & $60$ & Anizotropik termal difuzyon \\
+    EddyViscosity3D & \texttt{cs\_thermal} & $20$ & Termal SGS katsayisi \\
+    Buoyancy3D & \texttt{buoyancy\_strength} & $20$ & Katman bazli kaldirim kuvveti \\
+    \midrule
+    \multicolumn{2}{l}{Toplam termal} & $120$ & \\
+    \multicolumn{2}{l}{Toplam momentum} & $167$ & \\
+    \multicolumn{2}{l}{\textbf{Genel toplam}} & $\mathbf{287}$ & \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Her katmandaki zaman adimi algoritmasi asagidaki siralamayi izler:
+
+\begin{enumerate}
+  \item \textbf{Advection:} $\mathbf{u}^* = \mathbf{u}^n - \Delta t \,
+        (\mathbf{u}^n \cdot \nabla)\mathbf{u}^n + \Delta t\,\mathbf{F}
+        + \Delta t\,\text{Ri}\,\theta^n\hat{\mathbf{e}}_y$
+  \item \textbf{Diffusion:} $\mathbf{u}^{**} = \mathbf{u}^* + \Delta t\,
+        \nu_\text{eff}\nabla^2\mathbf{u}^*$
+  \item \textbf{Projection:} $\mathbf{u}^{n+1} = \mathbf{u}^{**} -
+        \nabla p^{n+1}$, \quad $\nabla \cdot \mathbf{u}^{n+1} = 0$
+  \item \textbf{Termal advection:} $\theta^* = \theta^n - \Delta t\,
+        (\mathbf{u}^{n+1} \cdot \nabla)\theta^n$
+  \item \textbf{Termal diffusion:} $\theta^{n+1} = \theta^* + \Delta t\,
+        \kappa_\text{eff}\nabla^2\theta^* + \Delta t\, v^{n+1}/L_y$
+  \item \textbf{Gauge fix:} $\theta^{n+1} \leftarrow \theta^{n+1}
+        - \langle\theta^{n+1}\rangle$ (ortalama kaldirma)
+  \item \textbf{Elevator mode removal:} $k_y = 0$ modlarini sifirla
+\end{enumerate}
+
+Termal egitim icin dort yeni loss terimi tanimlanmistir:
+
+\begin{align}
+  \mathcal{L}_{v\theta} &= \left(
+    \log(|\langle v\theta\rangle| + \epsilon)
+    - \log(|\langle v\theta\rangle_\text{ref}| + \epsilon)
+  \right)^2
+  \label{eq:loss-vtheta} \\
+  \mathcal{L}_\text{corr} &= \left(
+    \frac{\langle v\theta\rangle}{\sqrt{\text{TKE}} \cdot \theta_\text{rms}}
+    - \frac{\langle v\theta\rangle_\text{ref}}{\sqrt{\text{TKE}_\text{ref}} \cdot \theta_{\text{rms,ref}}}
+  \right)^2
+  \label{eq:loss-corr} \\
+  \mathcal{L}_{\theta,\text{rms}} &= \left(
+    \log(\theta_\text{rms} + \epsilon)
+    - \log(\theta_{\text{rms,ref}} + \epsilon)
+  \right)^2
+  \label{eq:loss-theta-rms} \\
+  \mathcal{L}_{\theta,\text{min}} &= \left[
+    \max(0,\; 0.015 - \theta_\text{rms})
+  \right]^2
+  \label{eq:loss-theta-min}
+\end{align}
+
+\noindent Nusselt referans loss'u ($\mathcal{L}_\text{Nu,ref}$) tanimlanmis
+ancak \emph{damping paradoksu} nedeniyle sifir agirlikla devre disi
+birakilmistir (Bolum~\ref{sec:damping-paradox}).
+
+
+% =============================================================================
+\subsection{Egitim Surecinde Karsilasilan Sorunlar}
+\label{sec:training-problems}
+
+Termal genisletme sonrasi gerceklestirilen coklu egitim denemeleri, asagida
+kronolojik siralamayla ozetlenen sorunlarla karsilasmistir.
+
+\subsubsection{Gradient Baskinligi}
+
+Multi-objective loss fonksiyonunda momentum terimleri ($\mathcal{L}_\text{TKE}$,
+$\mathcal{L}_\text{slope}$, $\mathcal{L}_\text{shape}$) termal terimlere
+($\mathcal{L}_{\theta,\text{rms}}$, $\mathcal{L}_{v\theta}$) kiyasla
+cok daha guclu gradient uretmektedir. Deneysel olcum:
+
+\begin{table}[H]
+  \centering
+  \caption{Loss terimlerinin gradient norm karsilastirmasi (tipik egitim).}
+  \label{tab:grad-norms}
+  \begin{tabular}{lcc}
+    \toprule
+    Loss terimi & $\|\nabla_\theta \mathcal{L}\|$ & Sinif \\
+    \midrule
+    $\mathcal{L}_\text{TKE,ref}$       & $\sim 1{,}153$ & Momentum \\
+    $\mathcal{L}_\text{slope,ref}$     & $\sim 487$     & Momentum \\
+    $\mathcal{L}_\text{shape}$          & $\sim 312$     & Momentum \\
+    $\mathcal{L}_{\theta,\text{rms}}$   & $\sim 12$      & Termal \\
+    $\mathcal{L}_{v\theta}$             & $\sim 8$       & Termal \\
+    $\mathcal{L}_\text{corr}$           & $\sim 5$       & Termal \\
+    $\mathcal{L}_\text{Nu,ref}$         & ---            & Devre disi \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Bu dengesizlik, multi-objective optimizasyonda bilinen \emph{gradient dominance}
+sorununa karsilik gelmektedir. Toplam loss:
+
+\begin{equation}
+  \mathcal{L}_\text{total}
+  = \sum_{i \in \mathcal{M}} w_i \mathcal{L}_i
+  + \sum_{j \in \mathcal{T}} w_j \mathcal{L}_j
+  \label{eq:total-loss}
+\end{equation}
+
+\noindent icin, momentum terimleri domine ettiginde optimizer efektif olarak
+sadece $\nabla_\theta \sum_{i \in \mathcal{M}} w_i \mathcal{L}_i$ yonunde
+hareket eder. Termal parametreler (ozellikle \texttt{cs\_thermal},
+\texttt{kappa\_scale}) uzerindeki gradient sinyali gurultu seviyesine duser.
+
+Bu sorunu hafifletmek icin \emph{gradient routing} stratejisi uygulanmistir:
+parametreler momentum, termal ve ``bridge'' gruplarina ayrilmis, her grubun
+sadece ilgili loss terimlerinden gradient almasi saglanmistir. Ancak bu
+yaklasim momentum-termal coupling'in dogasi geregi tam olarak izole edilemez
+(Bolum~\ref{sec:vtheta-deadlock}).
+
+
+\subsubsection{$\theta_\text{rms}$ Cokusu (Isothermal Collapse)}
+\label{sec:theta-collapse}
+
+Egitim suresinin ilk 100--200 epoch'unda, sicaklik alani sistematik olarak
+duzlesmekte ($\theta_\text{rms} \to 0$) ve model fiilen izothermal moda
+geri donmektedir. Bu davranis ``isothermal collapse'' olarak
+adlandirilmistir.
+
+Mekanizma su sekilde gerceklesmektedir: Termal gradient zayiflayinca
+buoyancy terimi $\text{Ri}\,\theta\hat{\mathbf{e}}_y \to 0$ olur, bu da
+momentum denklemini saf izothermal hale indirir. Izothermal modda momentum
+loss'lari ($\mathcal{L}_\text{TKE}$, $\mathcal{L}_\text{slope}$) dusuktir
+cunku model izothermal icin zaten egitilmistir. Dolayisiyla optimizer termal
+aktiviteyi bastirmak icin bir ``tesviki'' vardir --- az termal = az
+termal loss = toplam loss dusmez ama momentum loss'lari minimize edilir.
+
+Guard rail olarak $\mathcal{L}_{\theta,\text{min}}$ (Denklem~\ref{eq:loss-theta-min})
+eklenmistir: $\theta_\text{rms} < 0.015$ durumunda penalize eder. Ancak bu
+yapay bir esik, fiziksel termal yapiyi degil sadece minimum varyans
+seviyesini zorlayarak ``hayatta kalmasi'' saglar. Model boylece
+$\theta_\text{rms} \approx 0.015$'te sabitlenmekte ama \emph{fiziksel anlami
+olan} termal yapi (plume'lar, termal sinir tabakasi) olusmamaktadir.
+
+
+\subsubsection{$\langle v\theta \rangle$ Baglanti Cikmazi (Coupling Deadlock)}
+\label{sec:vtheta-deadlock}
+
+Termal flux $\langle v\theta \rangle$ hem hiz ($v$) hem sicaklik ($\theta$)
+alaninin fonksiyonudur. $\mathcal{L}_{v\theta}$ loss'u iki yoldan
+kucultulmeye calisilabilir:
+
+\begin{enumerate}
+  \item $\theta$'yi duzelt (termal yapi iyilestir) $\Rightarrow$
+        \emph{dogru yol}
+  \item $|v|$'yi artir (daha buyuk hiz = daha buyuk korelasyon) $\Rightarrow$
+        \emph{yanlis yol}, TKE artar
+\end{enumerate}
+
+Optimizer tipik olarak 2.~yolu secmektedir cunku momentum parametrelerinin
+gradient norm'u cok daha buyuktur ve $v$'yi artirmak daha kolay bir
+optimizasyon yoludur. Sonuc: TKE referansin uzerine cikar
+($\mathcal{L}_\text{TKE}$ artar), $\theta$ duzelmez, iki loss birbirine ters
+calisir.
+
+$\mathcal{L}_\text{corr}$ (Denklem~\ref{eq:loss-corr}) bu deadlock'u kirmak
+icin tasarlanmistir: TKE'yi normalize ederek korelasyonun kendisini
+hedefler. Ancak formulu genislettigimizde:
+
+\begin{equation}
+  C_{v\theta} = \frac{\langle v\theta \rangle}{\sqrt{\text{TKE}} \cdot \theta_\text{rms}}
+  \label{eq:correlation-coefficient}
+\end{equation}
+
+\noindent $C_{v\theta}$'nin gradientleri \emph{yine} hem $v$ hem $\theta$'ya
+akar. Quotient rule'dan:
+
+\begin{equation}
+  \frac{\partial C_{v\theta}}{\partial v}
+  = \frac{\theta \cdot \sqrt{\text{TKE}} \cdot \theta_\text{rms}
+          - \langle v\theta \rangle \cdot \frac{v}{2\sqrt{\text{TKE}}} \cdot \theta_\text{rms}}
+         {(\sqrt{\text{TKE}} \cdot \theta_\text{rms})^2}
+  \label{eq:corr-gradient}
+\end{equation}
+
+Bu ifade gostermektedir ki $C_{v\theta}$'nin gradient'i de momentum
+parametrelerine akmaktan kacinamaz. Deadlock hafifletilir ama \emph{tamamen
+cozulmez}.
+
+\subsubsection{Buoyancy Instabilitesi}
+
+\texttt{buoyancy\_strength} ogrenilebilir parametresi, gradient descent
+tarafindan sistematik olarak arttirilmistir. Fiziksel mekanizma:
+
+\begin{equation}
+  \text{Ri}_\text{eff} \uparrow \implies
+  \text{Ri}\,\theta\hat{\mathbf{e}}_y \uparrow \implies
+  |v| \uparrow \implies
+  \text{TKE} \uparrow
+  \label{eq:buoyancy-feedback}
+\end{equation}
+
+TKE artisi $\mathcal{L}_\text{TKE,ref}$'i azalttigi icin optimizer bu
+yonelimi ``faydali'' olarak degerlendirmektedir. Ancak fiziksel olarak
+buoyancy'nin asiri artmasi sicaklik alanini bozar, tum termal yapi yikilir.
+Clamp $[\text{0.001},\;\text{0.05}]$ uygulanmis olmakla birlikte ust sinira
+yapisarak kalmistir.
+
+
+% =============================================================================
+\subsection{Basarisizligin Kok Neden Analizi}
+\label{sec:root-cause}
+
+Termal denemenin basarisizliginin on temel nedeni belirlenmistir. Bu
+nedenler ``yapîsal'' (mimarinin temel siniri, kod degisikligi ile
+cozulemez) ve ``muhendislik'' (prensipte duzeltilebilir, yeterli
+muhendislik eforu ile) kategorilerine ayrilmaktadir.
+
+
+\subsubsection{Yapisal Nedenler (Fundamental)}
+\label{sec:fundamental-causes}
+
+\paragraph{Neden 1: Skaler Parametrelerin Mekansal Yetersizligi}
+
+INNATE'te her katmandaki termal difuzyon, $\kappa_\text{eff} =
+\kappa + \nu_t/\text{Pr}_t$ formuluyle modellenmektedir. Burada
+$\text{Pr}_t$ turbulansi Prandtl sayisidir ve her katmanda tek bir skaler
+(\texttt{cs\_thermal}) ile parametrize edilmistir.
+
+Gercekte $\text{Pr}_t$ \emph{mekansal olarak degisen} bir buyukluktur.
+DNS verileri gostermektedir ki \cite{kays1994turbulent}:
+
+\begin{itemize}
+  \item Duvar yakininda: $\text{Pr}_t \to 1.1$--$1.3$
+        (molekuler difuzyon baskisinda)
+  \item Serbest kayma bolgesinde: $\text{Pr}_t \approx 0.7$--$0.9$
+  \item Termal plume icerisinde: $\text{Pr}_t$ anizotropik ve $\sim 0.5$--$2.0$
+        arasi degisir
+\end{itemize}
+
+Tek bir skaler ile bu mekansal heterojenitenin temsil edilmesi \emph{bilgi
+teorik olarak imkansizdir}. INNATE katman basina tek bir
+$\text{Pr}_t^\text{eff}$ atayabilir, bu da uzaysal ortalamadir:
+
+\begin{equation}
+  \text{Pr}_t^\text{layer} = \frac{1}{V}\int_V \text{Pr}_t(\mathbf{x})\,dV
+  \label{eq:prt-average}
+\end{equation}
+
+Bu ortalama deger ne duvar yakinindaki ne de serbest akim bolgesindeki
+dogru davranisi yakalar.
+
+\emph{Cozum onerisi:} Adaptif mekansal $\text{Pr}_t$ --- ornegin spectral
+space'de dalga sayisina bagimli $\text{Pr}_t(k)$, ya da fiziksel uzayda
+yerel strain rate'e bagimli formulasyon.
+
+
+\paragraph{Neden 2: $\langle v\theta \rangle$ Coupling Deadlock (Yapisal)}
+
+Bolum~\ref{sec:vtheta-deadlock}'te aciklandigi uzere, $\langle v\theta \rangle$
+buyuklugu hem momentum hem termal alana baglidir. 120 termal parametre ile
+bu iki alanin \emph{birlesik} istatistiklerini kontrol etmek yapisal olarak
+mumkun degildir: termal parametreler $\theta$'yi degistirir ama $v$'yi
+dolayisiyla degistirir (buoyancy uzerinden), bu dolaylillik gradient sinyalini
+zayiflatir.
+
+Matematiksel olarak, Jacobian'in termal blogu:
+
+\begin{equation}
+  \frac{\partial \langle v\theta \rangle}{\partial \phi_\text{thermal}}
+  = \left\langle v \frac{\partial \theta}{\partial \phi_\text{thermal}} \right\rangle
+  + \left\langle \theta \frac{\partial v}{\partial \phi_\text{thermal}} \right\rangle
+  \label{eq:vtheta-jacobian}
+\end{equation}
+
+\noindent Ikinci terim ($\partial v / \partial \phi_\text{thermal}$) buoyancy
+zincirinden gecer: $\phi_\text{thermal} \to \theta \to \text{Ri}\theta\hat{e}_y
+\to v$. Bu zincir 20 katman boyunca \emph{vanishing gradient} sorunu yasatir
+cunku her katmanda diffusion ve projection operasyonlari gradient'i
+sonumlendirir.
+
+
+\paragraph{Neden 3: Multi-Scale Zaman Problemi}
+
+Momentum ve termal alanlar farkli karakteristik zaman olceklerine sahiptir:
+
+\begin{equation}
+  \tau_\text{momentum} \sim \frac{L}{U} = \frac{L_y}{u_\text{rms}}
+  \label{eq:tau-momentum}
+\end{equation}
+
+\begin{equation}
+  \tau_\text{thermal} \sim \frac{L^2}{\kappa} = \text{Re} \cdot \text{Pr} \cdot L^2
+  \label{eq:tau-thermal}
+\end{equation}
+
+$\text{Re} = 7{,}000$, $\text{Pr} = 0.71$ icin:
+\begin{align*}
+  \tau_m &\sim \frac{10}{0.13} \approx 77 \quad \text{(zaman birimi)} \\
+  \tau_\theta &\sim 7000 \times 0.71 \times 100 = 4.97 \times 10^5
+  \quad \text{(zaman birimi)}
+\end{align*}
+
+Oran: $\tau_\theta / \tau_m \sim 6{,}500$. INNATE'in 20 katmani
+$20 \times \Delta t = 20 \times 0.025 = 0.5$ zaman birimi kapsamaktadir.
+TBPTT (Truncated Backpropagation Through Time) ile 10--20 forward pass
+yapilsa bile toplam pencere $\sim 10$ zaman birimi, bu momentum icin yeterli
+ancak termal difuzyonun tam gelismesi icin \emph{dort mertebe yetersizdir}.
+
+Bunun pratik sonucu: termal yapi henuz istatistiksel dengeye ulasmadan
+loss hesaplaniyor ve gradient \emph{gecici} (transient) duruma gore
+hesaplaniyor --- istatistiksel karararli (stationary) duruma degil.
+
+
+\paragraph{Neden 4: Parametre Sayisi Yetersizligi}
+
+120 termal parametre ile asagidaki uc fiziksel fenomenin \emph{hepsinin}
+ayni anda ogrenilmesi gerekmektedir:
+
+\begin{enumerate}
+  \item \textbf{Buoyancy-turbulansi etkilesimi:} Richardson sayisina bagli,
+        guclu nonlineerlik (turbulansi bastirilmasindan turbulansi
+        guclendirilmesine gecis $\text{Ri} \sim 0.1$'de olur)
+  \item \textbf{Termal sinir tabakasi:} $\text{Pr}_t$'nin mekansal degisimi,
+        duvar-yakin davranis (periyodik BC'de gercek duvar yoktur ama
+        buoyancy ``etkin duvarlar'' olusturur)
+  \item \textbf{Mixed convection rejimleri:} Zorlanmis (forced) ve dogal
+        (natural) konveksiyon arasindaki gecis
+\end{enumerate}
+
+Bu uc fizik birbirine nonlineer olarak baglidir. Ornegin buoyancy-turbulansi
+etkilesimi, $\text{Ri}$ arttikca termal sinir tabakasini da degistirir,
+bu da $\text{Pr}_t$ dagiliminini etkiler, bu da efektif $\kappa_t$'yi
+degistirir ve tekrar buoyancy'yi etkiler. Bu geri besleme dongusu, skaler
+parametrelerle ``duzenlenebilecek'' bir nonlineerligin otesindedir.
+
+Karsilastirma: FNO \cite{li2021fno} ayni problem icin $\sim 500{,}000$
+parametre kullanir ve bunlarin \emph{hepsi} mekansal bilgi tasir (Fourier
+modlari). INNATE'in 120 termal parametresi bunun $\sim 1/4{,}000$'i kadardir.
+
+
+\subsubsection{Muhendislik Nedenleri (Prensipte Duzeltilebilir)}
+\label{sec:engineering-causes}
+
+\paragraph{Neden 5: Damping Paradoksu}
+\label{sec:damping-paradox}
+
+INNATE'in referans verileri, \emph{sonumlu} (damped) LES cozucusunden
+elde edilmistir. LES cozucusu buoyancy kaynakli instabiliteleri kontrol
+etmek icin anizotropik sigma-profil sonumleme kullanmaktadir:
+
+\begin{equation}
+  \sigma(\mathbf{k}) = -\frac{1}{2}(\nu + \kappa)|\mathbf{k}|^2
+  + \sqrt{\frac{1}{4}(\nu - \kappa)^2|\mathbf{k}|^4
+  + \text{Ri}\frac{1}{L_y}\frac{k_x^2 + k_z^2}{|\mathbf{k}|^2}}
+  \label{eq:growth-rate}
+\end{equation}
+
+\begin{equation}
+  \gamma_\text{damp}(\mathbf{k}) = s \cdot \max(0, \sigma(\mathbf{k}))
+  \label{eq:damping-profile}
+\end{equation}
+
+\noindent burada $s = 3.5$ guvenlik faktoru. Bu sonumleme momentum ($v$)
+ve sicaklik ($\theta$) alanlarinin Fourier katsayilarina her adimda
+uygulanmaktadir.
+
+Sonuc olarak, LES referans Nusselt sayisi ``sonumlenmis'' bir fizigin
+ciktisidir. Sonumlemesiz LES ile karsilastirildiginda:
+
+\begin{table}[H]
+  \centering
+  \caption{Damping paradoksu: Re=10{,}000 LES karsilastirmasi.}
+  \label{tab:damping-paradox}
+  \begin{tabular}{lccc}
+    \toprule
+    & Nu & $\langle v\theta \rangle$ & $\theta_\text{rms}$ \\
+    \midrule
+    LES (sonumlu)       & 70.5   & $9.78 \times 10^{-4}$ & 0.0268 \\
+    LES (sonumsuz)      & 124.2  & $1.74 \times 10^{-3}$ & 0.0550 \\
+    Hata                 & \textbf{43.3\%} & \textbf{43.6\%} & \textbf{51.3\%} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+INNATE modeli sonumleme icermeyen ($s = 0$) bir PDE cozmektedir ama referans
+olarak sonumlenmis degerleri hedeflemektedir. Bu sistematik \%43 uyumsuzluk,
+$\mathcal{L}_\text{Nu,ref}$'in devre disi birakilmasina yol acmistir.
+$\mathcal{L}_\text{Nu,ref}$ kapatilinca Nusselt sayisi \emph{hicbir loss
+terimi tarafindan dogrudan yonlendirilmemektedir}; $\langle v\theta \rangle$
+uzerinden dolayli hedeflenmesi ise yetersiz kalmistir.
+
+\emph{Cozum onerisi:} Ya INNATE'e esit sonumleme eklemek ya da sonumlemesiz
+LES referans uretmek. Ikincisi, buoyancy instabilitesi nedeniyle
+$\text{Re} \geq 7{,}000$'de kararsizdir.
+
+
+\paragraph{Neden 6: Gradient Routing Hatasi ($\text{Pr}_t$)}
+
+Turbulansi Prandtl sayisi (\texttt{cs\_thermal}) EddyViscosity3D modulu
+icerisinde tanimlanmistir. Gradient routing sistemi bu parametreyi
+``momentum'' grubuna atamistir cunku EddyViscosity kelimesi momentum
+keyword'lerinden birine eslesmektedir (\texttt{eddy}). Sonuc: termal loss'larin
+gradient'i $\text{Pr}_t$'ye ulasmamistir.
+
+Bu bug duzeltildikten sonra bile $\text{Pr}_t$ egitim surecinde $\sim 0.72$'de
+takili kalmistir (beklenen: 0.85--1.0). Bunun nedeni Neden~1'dir:
+tek bir skaler $\text{Pr}_t$, uzaysal dagilimi temsil edemedigi icin
+optimizer tutarli bir gradient yonu bulamamaktadir.
+
+
+\paragraph{Neden 7: LES Referans Verisi Kalitesi}
+
+Periyodik sinir kosullarinda (periodic BC) ``gercek'' bir Nusselt sayisi
+tanimlamak fiziksel olarak sorunludur. Nusselt sayisi normalde duvar isi
+akisinin referans iletimine orani olarak tanimlanir:
+
+\begin{equation}
+  \text{Nu}_\text{wall} = \frac{q_\text{wall}}{k \cdot \Delta T / L}
+  \label{eq:nu-wall}
+\end{equation}
+
+Periyodik kutuda duvar yoktur. Kullanilan tanimda (Denklem~\ref{eq:nusselt-def}),
+$\text{Nu}$ hacimsel $\langle v\theta \rangle$'dan turetilmistir, bu da
+sinir tabakasi fizigini dogrudan yansitmaz. LES referanslarindaki TKE ve
+spektrum slope degerleri guvenilirdir (momentum buyuklukleri, sinir
+kosulundan bagimsiz) ancak Nu, $\langle v\theta \rangle$ ve $\theta_\text{rms}$
+degerleri sinir kosuluna duyarlidir.
+
+
+\paragraph{Neden 8: Buoyancy Damping Uyumsuzlugu}
+
+LES cozucusu \emph{Fourier uzayinda} her moda ozel sonumleme
+(Denklem~\ref{eq:damping-profile}) uygulamaktadir. INNATE ise fiziksel
+uzayda global bir sonumleme parametresi (\texttt{buoyancy\_damping\_strength})
+kullanmaktadir:
+
+\begin{equation}
+  \text{INNATE:} \quad
+  \begin{cases}
+    v \leftarrow v - \gamma \cdot v \\
+    \theta \leftarrow \theta - \gamma \cdot \theta
+  \end{cases}
+  , \quad \gamma = \text{BDS} \cdot \sqrt{\text{Ri}}
+  \label{eq:innate-damping}
+\end{equation}
+
+Bu formul tum Fourier modlarina \emph{ayni} sonumlemeyi uygular. Oysa
+fiziksel gerceklik, her dalga sayisinin farkli buyume hizina ($\sigma(\mathbf{k})$)
+sahip olmasidir. Dusuk $|\mathbf{k}|$ modlari (buyuk olcek) yuksek
+$|\mathbf{k}|$'ya (kucuk olcek) gore cok daha fazla sonumlenmelidir. Tek
+parametreli global sonumleme ya buyuk olcekleri yeterince sonumleyemez (ve
+model patlar) ya da kucuk olcekleri asiri sonumler (ve termal yapi kaybolur).
+
+
+\paragraph{Neden 9: Elevator Mode ve $k_y = 0$ Filtreleme}
+
+Periyodik kutuda $k_y = 0$ modlari (y-yonunde uniform, ``elevator'' modlari)
+buoyancy etkisiyle lineer olarak buyur ve kontrolsuz enerji birikimi yaratir.
+LES cozucu ve INNATE bu modlari her adimda sifirlamaktadir. Ancak bu
+filtreleme sicaklik alaninin $k_y = 0$ bilesenini de tamamen yok eder.
+Fiziksel olarak anlamsiz olmayan $k_y = 0$ termal modlar (ornegin yatay
+homojen sicaklik degisimi) de budanmaktadir; bu durum $\theta_\text{rms}$
+hesabini ve termal yapinin tam temsil edilmesini etkiler.
+
+
+\paragraph{Neden 10: Organizasyonel Karar}
+
+5-ajan teknik toplantisinda (ML Expert, CFD Expert, Architect, Codex Consultant,
+Coordinator) asagidaki konsensus olusmustur:
+
+\begin{quote}
+  ``Termal 120 parametre ile bu mimaride CALISTIRILMAZ. Sorun bug degil,
+  INNATE'in yapisal siniri. Skaler per-layer parametreler buoyancy coupling'in
+  spatial heterojenigini yakalayamiyor. Termal birak, momentum parla, tez yaz.''
+\end{quote}
+
+Bu karar, kalan muhendislik eforu ile elde edilebilecek iyilesmenin
+yapisal sinirlarin otesine gecilemeyecegi degerlendirmesine dayanmaktadir.
+
+
+% =============================================================================
+\subsection{Karsilastirmali Perspektif}
+\label{sec:comparative}
+
+INNATE'in termal basarisizligini daha genis bir baglamda
+degerlendirmek icin, diger neural CFD yaklasimlariyla karsilastirma
+sunulmaktadir.
+
+
+\subsubsection{Fourier Neural Operator (FNO)}
+
+FNO \cite{li2021fno} ve turevi olan FNO-3D, tum alanlari (hiz + sicaklik)
+birlesik bir tensor olarak isler. Tipik parametre sayisi 500K--2M arasidir.
+FNO'nun her katmani Fourier uzayinda \emph{mekansal bilgi tasir}: $R$ adet
+Fourier modu icin ogrenilen $R \times R$ karmasik carpan matrisi, her noktadaki
+etkilesimi implisit olarak yakalar. Bu yaklasim INNATE'ten temelden farklidir:
+INNATE bir \emph{emulator} (ayni PDE'yi ogrenilebilir katsayilarla cozer),
+FNO ise bir \emph{operator} (PDE'nin dogrudan cozum operatorunu ogrenir).
+
+FNO termal akislar icin uygulandiginda \cite{li2024geometry}, sicaklik alani
+momentum ile ayni $R$-modlu Fourier katmanindan gecer, boylece mekansal
+coupling otomatik olarak ogrenilir. Ancak FNO'nun fizik bilgisi yoktur:
+incompressibility, enerji korunumu gibi constraintler \emph{soft} loss olarak
+empoze edilebilir ama garanti edilemez.
+
+
+\subsubsection{DeepONet}
+
+DeepONet \cite{lu2021deeponet} branch-trunk mimarisi ile parametrik PDE'leri
+cozer. Multi-physics problemlerde tipik yaklasim, ayri branch network'ler
+kullanmak ve trunk'ta paylasimli uzaysal temsil olusturmaktir. Termal
+akislar icin rapor edilen parametre sayisi genellikle 100K--500K arasidir.
+
+DeepONet'in termal coupling icin avantaji, branch network'lerin yeterli
+kapasiteye sahip olmasidir: her parametre konfigurasyonu (Re, Ra, Pr) icin
+farkli bir cozum ailesi ogrenilir. Dezavantaji, INNATE gibi fizik
+garantisi tasimamasidir.
+
+
+\subsubsection{MeshGraphNets}
+
+Grafik tabanli yaklasimlar \cite{pfaff2021meshgraphnets} karmasik
+geometrilerde basarili olmustur. Termal akislar icin node ozellikleri
+$(u, v, w, p, \theta)$ seklinde genisletilir ve message passing ile hem
+momentum hem termal etkilesimler ogrenilir. Tipik parametre sayisi 1--10M.
+
+Bu modellerin INNATE'e gore temel avantaji, mekansal bilgiyi dogal olarak
+tasimasadir: her node'un komsulariyla etkilesimi, yerel fizigi (termal sinir
+tabakasi, plume yapisi) yakalayabilir.
+
+
+\subsubsection{Karsilastirma Ozeti}
+
+\begin{table}[H]
+  \centering
+  \caption{Neural CFD yaklasimlarinin termal akis basarimi karsilastirmasi.}
+  \label{tab:comparison}
+  \begin{tabular}{lcccl}
+    \toprule
+    Model & Param. & Fizik gar. & Termal & Yaklasim \\
+    \midrule
+    FNO-3D           & $\sim$500K  & Yok    & Basarili & Operator ogrenimi \\
+    DeepONet         & $\sim$200K  & Yok    & Basarili & Branch-trunk \\
+    MeshGraphNets    & $\sim$2M    & Yok    & Basarili & Message passing \\
+    JAX-CFD          & $\sim$128K  & Kismi  & Basarili & Diferansiyel \\
+    \textbf{INNATE}  & \textbf{287}& \textbf{Tam} & \textbf{Basarisiz} & Fizik noronlari \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Bu karsilastirma, INNATE'in termal basarisizliginin 287 parametreye ozgu
+bir ``bedelinin'' oldugunu gostermektedir. Fizik garantileri (divergence-free,
+enerji korunumu, CFL stabilitesi) karsiliginda mekansal temsil kapasitesi
+feda edilmistir. Diger yaklasimlar yuz binlerce parametrenin mekansal
+bilgi tasima kapasitesiyle termal coupling'i ogrenirken, INNATE'in skaler
+parametreleri bu bilgiyi kodlayamamistir.
+
+Bu bir tasarim trade-off'udur, basarisizlik degil: INNATE izothermal
+turbulansi 287 parametre ile yakalayan \emph{ilk} modeldir. Termal
+genisletme, bu ultra-kompakt mimarinin sinirini gostermistir.
+
+
+% =============================================================================
+\subsection{Alinan Dersler ve Gelecek Yonelimler}
+\label{sec:lessons-future}
+
+\subsubsection{Alinan Dersler}
+
+\begin{enumerate}
+  \item \textbf{Fizik garantisi $\neq$ fizik dogrulugu.}
+        INNATE'in Leray projeksiyon ile \emph{garanti ettigi} divergence-free
+        kosulu, momentum icin ``yeterli ve gerekli'' bir constrainttir.
+        Ancak termal fizik icin boyle kesin constraintler yoktur; Nusselt
+        sayisi, $\langle v\theta \rangle$ gibi buyuklukler \emph{istatistiksel}
+        nicelliklerdir ve training sonucu ortaya cikar. Garanti
+        mekanizmasinin yoklugunda, yeterli parametre kapasitesi sarttir.
+
+  \item \textbf{Multi-objective loss dengelemesi, azinlik fizigini oldurur.}
+        Gradient baskinligi sorunu (Neden 1), multi-task learning
+        literaturunde \cite{chen2018gradnorm, yu2020gradient} bilinen bir
+        problemdir. GradNorm, PCGrad gibi teknikler uygulanabilir; ancak
+        INNATE'in 287-parametre boyutuyla bu tekniklerin overhead'i
+        orantisizdir.
+
+  \item \textbf{Referans veri ile model fiziginin tutarli olmasi sarttir.}
+        Damping paradoksu (\%43 hata), verinin ``dogru'' olmasinin yetmedigini
+        gostermektedir. Referans verisinin \emph{modelin cozdugu PDE ile
+        ayni PDE'nin cozumu} olmasi gereklidir. Sonumlenmis LES $\neq$
+        Sonumlenmemis INNATE.
+
+  \item \textbf{Zaman olcegi uyumsuzlugu gizli bir katildir.}
+        $\tau_\theta / \tau_m \sim 10^3$ orani, TBPTT penceresinin
+        termal fizigin ogrenilebilmesi icin yetersiz kalmasina neden olur.
+        Bu bulgu, gelecekteki multi-scale neural PDE tasarimlari icin
+        genel bir uyaridir.
+
+  \item \textbf{``Calismiyor'' da bilimsel bir sonuctur.}
+        287-parametreli saf fizik noronlari ile mixed convection'in
+        ogrenilememesi, modelin \emph{representational capacity} sinirini
+        kesin olarak belirlemektedir. Bu bilgi, gelecek mimarilerin
+        boyutlandirilmasi icin degerlidir.
+\end{enumerate}
+
+\subsubsection{Gelecek Yonelimler}
+
+INNATE'in termal kapasitesini artirmak icin asagidaki yaklasimlar
+onerilmektedir. Her biri, belirlenen yapisal nedenlerin en az birini
+hedef almaktadir.
+
+\begin{enumerate}
+  \item \textbf{Adaptif Mekansal $\text{Pr}_t$:}
+        Dalga sayisina bagimli $\text{Pr}_t(k) = a + b\,|k|^c$ formulasyonu
+        ile mekansal heterojenitenin bir boyutunu yakalamak. Bu, Neden~1'i
+        dogrudan hedefler. Ek parametre: $\sim 60$ (3 parametre $\times$ 20
+        katman).
+
+  \item \textbf{Buoyancy Sabitleme:}
+        \texttt{buoyancy\_strength}'i ogrenilebilir parametre olmaktan
+        cikarip $\text{Ri} = \text{Ra}/(\text{Re}^2\text{Pr})$ formulune
+        sabitlemek. Bu, Neden~3 (buoyancy instabilitesi) ve kismen
+        Neden~2'yi (deadlock) hafifletir.
+
+  \item \textbf{Tutarli Referans Verisi:}
+        INNATE'in \emph{birebir ayni} PDE'sini cozen (sonumlemesiz)
+        bir DNS/LES cozucu ile referans uretmek. Bu, Neden~5'i
+        (damping paradoksu) tamamen ortadan kaldirir. Ancak sonumlemesiz
+        cozumun kararliligi $\text{Re} \geq 7{,}000$'de sorunludur.
+
+  \item \textbf{LoRA Fine-Tuning:}
+        Izothermal checkpoint'tan baslayarak, duzenli termal parametrelere
+        dusuk rankli adaptasyon (Low-Rank Adaptation) eklemek. LoRA,
+        izothermal bilgiyi korurken termal parametrelere ``ince ayar''
+        kapasitesi kazandirir. $r = 4$ rank ile ek parametre: $\sim 320$
+        (hala binler mertebesinde).
+
+  \item \textbf{IMEX (Implicit-Explicit) Zaman Entegrasyonu:}
+        Termal difuzyonu implicit, advection'i explicit yapmak.
+        Bu, Neden~3 (multi-scale zaman) sorununu hafifletir cunku
+        implicit adim CFL limitasyonu olmadan buyuk $\Delta t$ ile
+        termal difuzyonu cozer.
+
+  \item \textbf{Ikili Agirlik Egitimi (Two-Stage):}
+        Faz~1: Momentum parametreleri ogrenilir, termal dondurulur (mevcut
+        basarili izothermal rejim). Faz~2: Momentum dondurulur, \emph{sadece}
+        termal parametreler ogrenilir. Bu, gradient baskinligini tamamen
+        ortadan kaldirir (Neden~1 muhendislik boyutu).
+        \texttt{thermal\_train.py} bu stratejiyi uygulamistir ancak
+        yapisal nedenler (Nedenler~1--4) nedeniyle yetersiz kalmistir.
+\end{enumerate}
+
+
+\subsubsection{Neden Siniflandirmasi Ozet Tablosu}
+
+\begin{table}[H]
+  \centering
+  \caption{Termal basarisizlik nedenlerinin siniflandirmasi.}
+  \label{tab:cause-classification}
+  \begin{tabular}{clcc}
+    \toprule
+    \# & Neden & Tip & Hedef cozum \\
+    \midrule
+    1 & Skaler $\text{Pr}_t$ yetersizligi & Yapisal & Adaptif $\text{Pr}_t(k)$ \\
+    2 & $\langle v\theta \rangle$ deadlock & Yapisal & Ayrik termal network \\
+    3 & Multi-scale zaman & Yapisal & IMEX entegrasyon \\
+    4 & Parametre sayisi & Yapisal & LoRA / genisletme \\
+    5 & Damping paradoksu & Muhendislik & Tutarli referans \\
+    6 & Gradient routing hatasi & Muhendislik & Bug fix (\checkmark) \\
+    7 & Referans verisi kalitesi & Muhendislik & Periodic BC analizi \\
+    8 & Buoyancy damping uyumsuzlugu & Muhendislik & Fourier-domain damping \\
+    9 & Elevator mode filtreleme & Muhendislik & Secici $k_y = 0$ \\
+    10 & Organizasyonel karar & --- & Tez stratejisi \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+
+\subsubsection{Sonuc}
+
+INNATE'in termal denemesi, 287-parametreli saf fizik-noron mimarisinin
+izothermal turbulansi basariyla emule edebildigini ancak mixed convection
+icin yeterli temsil kapasitesine sahip olmadigini gostermistir. Bu sonuc,
+modelin bir \emph{zayifligi} oldugu kadar bir \emph{karakterizasyonudur}:
+literaturdeki ilk MLP-free neural CFD modeli olarak INNATE'in
+calisabilirlik sinirini kesin olarak belirlenmistir.
+
+Izothermal modda 167 etkin parametre ile elde edilen sonuclar ---
+TKE $\sim$\%14 hata, spektrum slope $-1.7$, $\text{div}_\text{max} < 10^{-5}$
+--- INNATE'in temel yaklasiminin gecerliligini kanitlamaktadir. Termal
+genisletmenin basarisizligi, bu gecerliligin sinirini gostermekte ve
+gelecek arastirmalar icin somut bir yol haritasi sunmaktadir.

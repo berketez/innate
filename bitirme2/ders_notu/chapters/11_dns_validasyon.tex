@@ -1,0 +1,326 @@
+\chapter{DNS Referans ve Validasyon}
+\label{ch:dns_validasyon}
+
+Bu projede INNATE modeli, fizik-tabanlı loss ile eğitilir; DNS verisi eğitimde kullanılmaz. Ancak modelin ürettiği sonuçların \textit{ne kadar doğru} olduğunu değerlendirmek için bağımsız bir referansa ihtiyaç vardır. Düşük Reynolds sayılarında ($\Rey \leq 3000$) pseudo-spectral DNS çalıştırarak ``ground truth'' üretilir; yüksek $\Rey$'te ($5000$--$10000$) ise DNS fiziksel olarak imkânsız olduğundan yalnızca \textit{fiziksel tutarlılık kriterleri} uygulanır.
+
+
+%% ============================================================
+\section{Pseudo-Spectral DNS Yöntemi}
+\label{sec:dns_yontem}
+
+DNS çözücümüz, Boussinesq denklemlerini tam çözünürlükte (tüm ölçekler dahil) hesaplar. Yöntemin temelinde spectral-fiziksel uzay ayrıştırması yatar.
+
+\subsection{Temel Prensip: Split Evaluation}
+
+Navier--Stokes denklemlerinin sağ tarafındaki terimler iki gruba ayrılır:
+
+\begin{enumerate}
+    \item \textbf{Lineer terimler} (difüzyon, basınç, kaldırma kuvveti):
+    Spectral uzayda \textit{kesin} hesaplanır. Örneğin difüzyon:
+    \begin{equation}
+        \widehat{\laplacian \vect{u}} = -|\vect{k}|^2 \, \hat{\vect{u}}(\vect{k})
+    \end{equation}
+    Burada kesilme hatası yoktur; sonuç makine hassasiyetinde doğrudur.
+
+    \item \textbf{Nonlineer terimler} (adveksiyon $\vect{u} \cdot \gradient \vect{u}$, termal adveksiyon $\vect{u} \cdot \gradient T'$):
+    Fiziksel uzayda noktasal çarpım olarak hesaplanır. Spectral uzayda bu terimler konvolüsyon gerektirir ($\mathcal{O}(N^2)$); fiziksel uzayda ise noktasal çarpım yeterlidir ($\mathcal{O}(N)$, FFT ile $\mathcal{O}(N\log N)$).
+\end{enumerate}
+
+\subsection{Bir Zaman Adımının Akışı}
+
+Her RK4 alt-adımında şu işlemler sırayla yapılır:
+
+\begin{enumerate}
+    \item \textbf{FFT:} $\hat{\vect{u}} = \mathcal{F}[\vect{u}]$. Hız ve sıcaklık alanlarını Fourier uzayına dönüştür.
+    \item \textbf{Spectral gradyanlar:} $\widehat{\partial u/\partial x_i} = i k_i \hat{u}$. Gradyanları Fourier uzayında kesin hesapla.
+    \item \textbf{IFFT:} Gradyanları fiziksel uzaya geri dönüştür.
+    \item \textbf{Nonlineer çarpım:} Fiziksel uzayda $u \cdot \partial u/\partial x + v \cdot \partial u/\partial y + w \cdot \partial u/\partial z$ hesapla.
+    \item \textbf{Dealiasing:} Nonlineer terimin FFT'sini al, 2/3 kuralıyla yüksek modları kes, IFFT ile geri dön.
+    \item \textbf{Spectral RHS:} Tüm terimleri (adveksiyon, difüzyon, forcing, buoyancy) topla.
+    \item \textbf{Zaman ilerlet:} RK4 formulasıyla bir sonraki durumu hesapla.
+    \item \textbf{Leray projeksiyonu:} $\divergence \vect{u} = 0$ koşulunu Fourier uzayında zorla:
+    \begin{equation}
+        \hat{u}_i^{\text{proj}} = \hat{u}_i - k_i \, \frac{k_j \hat{u}_j}{|\vect{k}|^2}
+    \end{equation}
+\end{enumerate}
+
+\begin{remark}
+RK4'te her ara adımda projeksiyon uygulanır, böylece sıkıştırılamazlık her an sağlanır. Alternatif olarak sadece son adımda projeksiyon yapmak daha hızlı olur ancak geçici divergence hatası biriktirir. Biz ilkini tercih ediyoruz.
+\end{remark}
+
+\subsection{DNS Parametreleri}
+
+\begin{table}[H]
+\centering
+\caption{DNS çözücü parametreleri.}
+\label{tab:dns_params}
+\begin{tabular}{lll}
+\toprule
+\textbf{Parametre} & \textbf{Değer} & \textbf{Açıklama} \\
+\midrule
+Grid              & $192 \times 320 \times 128$ & Kolmogorov ölçeğini çözen çözünürlük \\
+Domain            & $6 \times 10 \times 4$       & Boyutsuz ($H=1$) \\
+$\Delta t_{\mathrm{DNS}}$ & $0.001$ & CFL $< 0.3$ garantisi \\
+Zaman entegrasyonu & RK4 (4.\ derece Runge--Kutta) & \\
+Dealiasing        & 2/3 kuralı                   & \\
+Sınır koşulları & Tüm yönlerde periyodik & \\
+Hassasiyet        & float64                       & DNS doğruluğu için gerekli \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+%% ============================================================
+\section{DNS Grid Gereksinimleri: Kolmogorov Ölçeği}
+\label{sec:dns_grid}
+
+DNS'in temel koşulu, en küçük türbülans ölçeğinin (Kolmogorov mikro ölçeği) çözülmesidir.
+
+\subsection{Kolmogorov Ölçeği}
+
+Kolmogorov (1941) boyut analizi ile en küçük türbülans ölçeğini şu şekilde türetmiştir:
+\begin{equation}
+    \eta = \left( \frac{\nu^3}{\varepsilon} \right)^{1/4}
+    \label{eq:kolmogorov_scale}
+\end{equation}
+Burada $\nu$ kinematik viskozite, $\varepsilon$ türbülans enerji dissipasyon hızıdır.
+
+\textbf{Dissipasyon hızının tahmini:} Kolmogorov forcing ile türbülant dengede dissipasyon, enerji enjeksiyon hızına eşittir. Self-consistent tahmin:
+\begin{equation}
+    \varepsilon = P_{\text{forcing}}, \qquad
+    U_{\text{rms}} \sim (\varepsilon \, L_f)^{1/3}, \qquad
+    P_{\text{forcing}} \sim \frac{A \cdot U_{\text{rms}}}{2}
+\end{equation}
+Bu üç ifadeyi birleştirerek (detaylar Ek~\ref{ch:analitik}'te):
+\begin{equation}
+    \varepsilon = \left( \frac{A \, L_f^{1/3}}{2} \right)^{3/2}
+    \label{eq:dissipation_estimate}
+\end{equation}
+Bizim parametrelerimiz için ($A=1$, $L_f = L_y/k_f = 10$): $\varepsilon \approx 2.28$.
+
+\subsection{DNS Çözünürlük Kriteri}
+
+Grid boyutunun Kolmogorov ölçeğini çözebilmesi için:
+\begin{equation}
+    k_{\max} \eta > 1
+    \label{eq:dns_criterion}
+\end{equation}
+Burada $k_{\max} = \frac{2\pi}{3} \cdot \frac{N}{2L}$ (2/3 dealiasing sonrası en yüksek çözülen dalga sayısı). Üç boyut için en kısıtlayıcı yön $z$'dir ($L_z = 4$, $N_z = 128$).
+
+\subsection{Çözünürlük Tablosu}
+
+Aşağıdaki tabloda farklı $\Rey$ değerleri için Kolmogorov ölçeği ve DNS yeterliliği özetlenmiştir:
+
+\begin{table}[H]
+\centering
+\caption{Reynolds sayısına göre DNS çözünürlük analizi (grid: $192 \times 320 \times 128$).}
+\label{tab:dns_resolution}
+\begin{tabular}{rccccc}
+\toprule
+$\Rey$ & $\nu$ & $\eta$ & $k_{\max}\eta$ & DNS Yeterli? & Gerekli Grid \\
+\midrule
+$1000$  & $10^{-3}$  & $\approx 0.012$  & $\approx 2.0$  & \textbf{Evet} & $192 \times 320 \times 128$ \\
+$2000$  & $5 \times 10^{-4}$ & $\approx 0.007$ & $\approx 1.2$ & \textbf{Evet} (sınırda) & $192 \times 320 \times 128$ \\
+$3000$  & $3.3 \times 10^{-4}$ & $\approx 0.005$ & $\approx 0.8$ & \textbf{Sınır} & $256 \times 384 \times 192$ \\
+$5000$  & $2 \times 10^{-4}$ & $\approx 0.003$ & $\approx 0.5$ & \textbf{Hayır} & $\sim 480^3$ ($\sim 10^8$) \\
+$10000$ & $10^{-4}$  & $\approx 0.0015$ & $\approx 0.25$ & \textbf{Hayır} & $\sim 2000^3$ ($\sim 8.4 \times 10^9$) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{remark}
+$\Rey = 10000$'de DNS için yaklaşık $8.4 \times 10^9$ grid noktası gerekir. Bu, bir RTX~4090 (24\,GB VRAM) üzerinde float64 ile fiziksel olarak imkânsızdır. İşte tam da bu yüzden INNATE gibi neural operator yaklaşımlarına ihtiyaç vardır: kaba gridde ($96 \times 160 \times 64$) LES tarzı çözüm üretmek.
+\end{remark}
+
+
+%% ============================================================
+\section{DNS Validasyon Run Planı}
+\label{sec:dns_plan}
+
+DNS yalnızca validasyon amaçlı çalıştırılacak (eğitim verisi olarak değil). Üç referans run planlanmıştır:
+
+\begin{table}[H]
+\centering
+\caption{DNS validasyon run planı (RTX~4090 tahmini süreler).}
+\label{tab:dns_runs}
+\begin{tabular}{clcccc}
+\toprule
+\textbf{Run} & \textbf{Amaç} & $\Rey$ & $\Ray$ & \textbf{Grid} & \textbf{Tahmini Süre} \\
+\midrule
+1 & Baseline   & 1000 & $10^5$ & $192 \times 320 \times 128$ & $\sim 4$ saat \\
+2 & Mixed      & 2000 & $10^6$ & $192 \times 320 \times 128$ & $\sim 8$ saat \\
+3 & Max DNS Re & 3000 & $10^5$ & $192 \times 320 \times 128$ & $\sim 12$ saat \\
+\midrule
+  & \multicolumn{4}{l}{\textit{Toplam}}          & $\sim 24$ saat \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Neden Bu Parametreler?}
+
+\begin{itemize}
+    \item \textbf{Run~1} ($\Rey=1000$, $\Ray=10^5$, $\Rich \approx 0.14$): Düşük $\Rich$ --- zorlanmış konveksiyon baskın. Kolmogorov akışının türbülant yapısı kontrol edilir.
+    \item \textbf{Run~2} ($\Rey=2000$, $\Ray=10^6$, $\Rich \approx 0.35$): Mixed rejim --- kaldırma ve forcing dengede. En ilginç fizik burada gerçekleşir.
+    \item \textbf{Run~3} ($\Rey=3000$, $\Ray=10^5$, $\Rich \approx 0.016$): DNS'in ulaşabileceği en yüksek $\Rey$. Enerji spektrumunda $-5/3$ yasasının oluşması beklenir.
+\end{itemize}
+
+\subsection{Fourier Downsampling: DNS $\to$ INNATE Grid}
+
+INNATE modeli $96 \times 160 \times 64$ gridde çalışır. DNS verisini bu grade indirgemek için \textit{Fourier truncation} (spectral downsampling) kullanılır:
+
+\begin{enumerate}
+    \item DNS alanının 3D FFT'sini al: $\hat{f}_{192 \times 320 \times 128}$.
+    \item Yarıdan fazla dalga sayılarını kes (fftshift ile ortalayıp kırp):
+    \begin{equation}
+        \hat{f}_{\text{truncated}} = \text{crop}_{\text{center}} \left( \hat{f}_{\text{DNS}}, \; 96 \times 160 \times 64 \right)
+    \end{equation}
+    \item Ters FFT: $f_{\text{coarse}} = \mathcal{F}^{-1}[\hat{f}_{\text{truncated}}]$.
+    \item Normalizasyon: $f_{\text{coarse}} \leftarrow f_{\text{coarse}} \times \frac{N_x^t N_y^t N_z^t}{N_x^s N_y^s N_z^s}$.
+\end{enumerate}
+
+Bu yöntem, fiziksel uzayda interpolasyondan üstündür çünkü:
+\begin{itemize}
+    \item Aliasing üretmez (yüksek modlar tam kesilir).
+    \item Enerji spektrumunu korur (düşük dalga sayılarında).
+    \item LES filtresiyle eşdeğerdir: ``sharp spectral filter''.
+\end{itemize}
+
+
+%% ============================================================
+\section{Validasyon Metrikleri ($\Rey \leq 3000$, DNS Mevcut)}
+\label{sec:val_metrics}
+
+INNATE modeli DNS'in bulunduğu parametrelerde çalıştırılır ve aşağıdaki metrikler ölçülür.
+
+\subsection{Kinetik Enerji Evrimi}
+
+\begin{equation}
+    \epsilon_E(t) = \frac{|E_{\text{INNATE}}(t) - E_{\text{DNS}}(t)|}{E_{\text{DNS}}(t)}
+    \label{eq:energy_error}
+\end{equation}
+Burada $E(t) = \frac{1}{2} \langle |\vect{u}|^2 \rangle$ hacim ortalamasıdır.
+
+\textbf{Hedef:} $\epsilon_E < 0.15$ (\%15) istatistiksel denge bölgesinde.
+
+\subsection{Enstrophy Evrimi}
+
+\begin{equation}
+    \epsilon_Z(t) = \frac{|Z_{\text{INNATE}}(t) - Z_{\text{DNS}}(t)|}{Z_{\text{DNS}}(t)}
+    \label{eq:enstrophy_error}
+\end{equation}
+Burada $Z(t) = \frac{1}{2} \langle |\vect{\omega}|^2 \rangle$ enstrophy'dir. Enstrophy, küçük ölçeklere daha duyarlıdır; bu yüzden $\epsilon_Z > \epsilon_E$ olması normaldir.
+
+\textbf{Hedef:} $\epsilon_Z < 0.25$ (\%25).
+
+\subsection{Nusselt Sayısı}
+
+\begin{equation}
+    \Nus(t) = 1 + \frac{\langle v \, T' \rangle}{\kappa \, \Delta T / L_y}
+    \label{eq:nusselt_dns}
+\end{equation}
+Burada $\kappa = 1/(\Rey \cdot \Pran)$ boyutsuz termal difüzivitedir. $\Nus$ konvektif ısı transferinin bir ölçüsüdür. $\Nus = 1$ saf iletim, $\Nus > 1$ konveksiyon katkısı demektir.
+
+\textbf{Hedef:} INNATE ve DNS $\Nus$ değerleri arasında \%20'den az fark.
+
+\subsection{Enerji Spektrumu}
+
+\begin{equation}
+    E(k) = \sum_{k \leq |\vect{k}'| < k+1} \frac{1}{2} |\hat{\vect{u}}(\vect{k}')|^2
+    \label{eq:energy_spectrum}
+\end{equation}
+DNS ve INNATE'in $E(k)$ eğrileri log--log grafiğinde karşılaştırılır. DNS'te $E(k) \sim k^{-5/3}$ Kolmogorov yasasına uyan bir ``inertial subrange'' görülmelidir. INNATE'in bu eğimle uyumu kontrol edilir.
+
+\subsection{Alan Düzeyinde Karşılaştırma}
+
+\begin{equation}
+    \text{RMSE} = \sqrt{ \langle (\vect{u}_{\text{INNATE}} - \vect{u}_{\text{DNS}})^2 \rangle }
+    \label{eq:rmse}
+\end{equation}
+
+\begin{remark}
+Türbülant akışlarda deterministik alan karşılaştırması ($\text{RMSE}$) sınırlıdır. Lyapunov kararsızlığı nedeniyle iki simülasyon, başlangıç koşullarında en küçük farkla bile zaman içinde üstel olarak ayrışır. Bu yüzden istatistiksel büyüklükler ($E$, $Z$, $\Nus$, $E(k)$) deterministik RMSE'den daha anlamlıdır.
+\end{remark}
+
+
+%% ============================================================
+\section{Fiziksel Tutarlılık Kriterleri ($\Rey = 5000$--$10000$, DNS Yok)}
+\label{sec:consistency}
+
+Yüksek $\Rey$'te DNS yoktur. Modelin fiziksel olarak anlamlı sonuçlar üretip üretmediğini aşağıdaki \textit{gerekli koşullar} ile değerlendiririz. Bu koşullar ``doğru'' olduğunu kanıtlamaz, ama ``fiziksel olarak saçma olmadığını'' gösterir.
+
+\subsection{Sıkıştırılamazlık (Divergence)}
+
+Süreklilik denkleminin ne ölçüde sağlandığı:
+\begin{equation}
+    \| \divergence \vect{u} \|_\infty < 10^{-5}
+    \label{eq:div_criterion}
+\end{equation}
+Leray projeksiyonu bunu yapısal olarak sağlar; bu metrik sayısal birikim hatasını ölçer.
+
+\subsection{Enerji Dengesi}
+
+Kinetik enerji denklemini hacim üzerinde ortalarsak:
+\begin{equation}
+    \frac{dE}{dt} = -2\nu Z + P_{\text{forcing}} + P_{\text{buoyancy}}
+    \label{eq:energy_balance}
+\end{equation}
+Burada $P_{\text{forcing}} = \langle \vect{u} \cdot \vect{F} \rangle$ ve $P_{\text{buoyancy}} = \Rich \langle v\,T' \rangle$. İstatistiksel dengede $dE/dt \approx 0$, dolayısıyla:
+\begin{equation}
+    \frac{|dE/dt + 2\nu Z - P|}{|P|} < 0.1
+    \label{eq:balance_criterion}
+\end{equation}
+Burada $P = P_{\text{forcing}} + P_{\text{buoyancy}}$.
+
+\subsection{Enerji Spektrum Eğimi}
+
+Türbülant bir akışta inertial subrange'de:
+\begin{equation}
+    E(k) \sim k^{-\alpha}, \qquad \alpha = \frac{5}{3} \pm 0.3
+    \label{eq:spectrum_slope}
+\end{equation}
+Eğim $-5/3 \approx -1.67$'den çok sapmamalıdır. $|\alpha - 5/3| > 0.5$ ise model türbülansı doğru temsil edemiyordur.
+
+\subsection{Nusselt Alt Sınırı}
+
+\begin{equation}
+    \Nus \geq 1
+    \label{eq:nusselt_bound}
+\end{equation}
+$\Nus < 1$ fiziksel olarak imkânsızdır (konveksiyon iletime göre ısı transferini azaltamaz). Bu, modelin en temel termodinamik kurallarına uyup uymadığını test eder.
+
+\subsection{Sayısal Stabilite}
+
+\begin{equation}
+    \text{1000 adım boyunca NaN-free}
+    \label{eq:stability}
+\end{equation}
+Model diverge etmemeli, sonsuz veya NaN değer üretmemelidir. Bu, $\Delta t_{\text{INNATE}} = 0.005$ ile $t = 5$ birim zamana karşılık gelir.
+
+\subsection{Sıcaklık Sınırları}
+
+Toplam sıcaklık $T = T_{\text{base}}(y) + T'$ için:
+\begin{equation}
+    T_{\text{cold}} \leq T(x,y,z,t) \leq T_{\text{hot}}
+    \label{eq:temp_bounds}
+\end{equation}
+Bu, ``undershoot/overshoot'' olmadığını kontrol eder. Küçük ihlaller ($\pm 5\%$) tolere edilebilir (sayısal difüzyon nedeniyle), ancak büyük ihlaller fiziksel tutarsızlık göstergesidir.
+
+\subsection{Özet: Kriterlerin Sınıflandırılması}
+
+\begin{table}[H]
+\centering
+\caption{Fiziksel tutarlılık kriterleri özeti.}
+\label{tab:consistency_criteria}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Kriter} & \textbf{Formul} & \textbf{Eşik} \\
+\midrule
+Divergence-free       & $\| \divergence \vect{u} \|_\infty$ & $< 10^{-5}$ \\
+Enerji dengesi        & $|dE/dt + 2\nu Z - P| / |P|$       & $< 0.1$ \\
+Spektrum eğimi    & $|\alpha - 5/3|$                     & $< 0.3$ \\
+Nusselt alt sınır & $\Nus$                              & $\geq 1$ \\
+Stabilite             & NaN kontrol                          & 1000 adım \\
+Sıcaklık sınır & $T_c \leq T \leq T_h$          & Tolerans $\pm 5\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}

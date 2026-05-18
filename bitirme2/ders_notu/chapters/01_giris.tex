@@ -1,0 +1,153 @@
+\chapter{Giriş ve Motivasyon}
+\label{ch:giris}
+
+\section{Mixed Convection Nedir?}
+\label{sec:mixed_nedir}
+
+Isı transferi mekanizmaları, akışkan hareketinin kaynağına göre üç temel kategoride incelenir:
+
+\begin{enumerate}
+    \item \textbf{Doğal (serbest) konveksiyon:} Akışkan hareketi, yalnızca sıcaklık farkının yarattığı yoğunluk değişimlerinden kaynaklanır. Sıcak akışkan hafifler ve yükselir; soğuk akışkan ağırlaşır ve alçalır. Bu döngü, kaldırma kuvveti (buoyancy) tarafından sürdürülür. Örneğin: kalorifer üstündeki sıcak havanın yükselmesi.
+
+    \item \textbf{Zorlanmış (forced) konveksiyon:} Akışkan hareketi, dış bir mekanik kuvvetle (fan, pompa, rüzgâr) sağlanır. Sıcaklık farkları akış yapısını belirgin şekilde etkilemez; sıcaklık bir ``pasif skaler'' gibi taşınır. Örneğin: fan ile soğutulan bilgisayar işlemcisi.
+
+    \item \textbf{Karışık (mixed) konveksiyon:} Kaldırma kuvveti ile dış kuvvet aynı anda etkilidir ve her ikisinin de akış yapısına önemli katkısı vardır. Ne biri ne diğeri ihmal edilebilir. Bu rejim, Richardson sayısının $\Rich \sim \mathcal{O}(1)$ olduğu duruma karşılık gelir.
+\end{enumerate}
+
+Mixed convection, fiziksel olarak en karmaşık rejimdir. Çünkü hız ve sıcaklık alanları \textit{iki yönlü} (bidirectional) olarak bağlıdır:
+\begin{itemize}
+    \item Sıcaklık farkı akışı etkiler (kaldırma kuvveti).
+    \item Akış sıcaklık dağılımını etkiler (adveksiyon ile ısı taşınımı).
+\end{itemize}
+Bu iki-yönlü bağlantı, denklemlerin çözümünü zorlaştırır ve zengin fiziksel yapılara (tilted plumes, sheared convection cells, büyük ölçekli sirkülasyon) yol açar.
+
+
+\section{Günlük Hayattan ve Endüstriden Örnekler}
+\label{sec:ornekler}
+
+Mixed convection, günlük yaşamda ve mühendislikte her yerdedir:
+
+\subsection{Bina Havalandırma (HVAC)}
+Bir odada ısıtıcılar alt taraftan sıcak hava verir (doğal konveksiyon), aynı zamanda havalandırma fanı taze hava üfler (zorlanmış konveksiyon). Konfor analizi ve enerji verimliliği hesaplamalarında her iki etki birlikte hesaba katılmak zorundadır.
+
+\subsection{Atmosferik Sınır Tabaka}
+Güneşten ısınan yer yüzeyi sıcak hava kab arcıkları oluşturur (thermals). Aynı anda yatay rüzgâr bu yapıları keser ve deforme eder. Hava tahmin modelleri bu etkileşimi doğru yakalamak zorundadır.
+
+\subsection{Elektronik Soğutma}
+Bir sunucu odasında işlemciler ısı üretir (doğal konveksiyon), fanlar hava üfler (zorlanmış konveksiyon). Yanlış tasarım ``hot spot'' oluşumuna ve donanım arızasına yol açabilir.
+
+\subsection{Nükleer Reaktör Güvenliği}
+Normal çalışmada soğutucu pompalarla dolaştırılır (forced). Pompa arızasında akış yalnızca kaldırma kuvvetiyle sürdürülür (natural). Geçiş rejimi (mixed) en kritik senaryodur ve güvenlik analizlerinde doğru modellenmesi zorunludur.
+
+\subsection{Metal Döküm ve Kristal Büyütme}
+Erimiş metal veya yarı iletken sıvısında, sıcaklık gradyanları doğal konveksiyonu tetikler; aynı zamanda döndürme veya manyetik alan zorlanmış konveksiyon yaratabilir. Ürün kalitesi bu akış yapılarına bağlıdır.
+
+
+\section{Araştırma Motivasyonu}
+\label{sec:motivasyon}
+
+Mixed convection problemlerinin modellenmesi, birkaç temel zorluk barındırır:
+
+\begin{enumerate}
+    \item \textbf{Geniş parametre uzayı:} Üç bağımsız boyutsuz sayı ($\Rey$, $\Ray$, $\Pran$) farklı kombinasyonlarda tamamen farklı akış yapıları üretir. Tek bir simülasyon bir nokta verir; parametre uzayının sistematik taranması gerekir.
+
+    \item \textbf{3B geometri:} Üç boyutlu akışlarda 2B'de görülmeyen yapılar ortaya çıkar: helikal girdaplar, 3B plume etkileşimleri, spanwise instability. 2B simülasyonlar yanıltıcı olabilir.
+
+    \item \textbf{Türbülans:} Yüksek $\Rey$ ve $\Ray$ değerlerinde akış türbülant olur. Tüm ölçekleri çözmek (DNS) çok pahalıdır; büyük ölçekleri çözüp küçükleri modellemek (LES) gerekir.
+\end{enumerate}
+
+
+\section{Geleneksel CFD'nin Sınırlamaları}
+\label{sec:cfd_sinirlar}
+
+Hesaplamalı akışkanlar dinamiği (CFD), Navier--Stokes denklemlerini sayısal olarak çözer. Son 50 yılda muazzam ilerleme kaydedilmiştir, ancak temel sınırlamalar devam etmektedir:
+
+\subsection{Hesaplama Maliyeti}
+DNS (Direct Numerical Simulation), türbülant akışta tüm ölçekleri çözer. Grid nokta sayısı $N \sim \Rey^{9/4}$ ile ölçeklenir (3B'de). Bir örnek:
+\begin{itemize}
+    \item $\Rey = 1000$: $N \sim 10^7$ nokta $\to$ bir dizüstü bilgisayarda saatler.
+    \item $\Rey = 10{,}000$: $N \sim 10^{9.75} \approx 6 \times 10^9$ nokta $\to$ süper bilgisayar.
+    \item $\Rey = 100{,}000$: $N \sim 10^{11.25}$ nokta $\to$ mevcut teknolojiyle imkânsız.
+\end{itemize}
+Mixed convection'da durumu daha da zorlastıran, sıcaklık alanının da aynı çözünürlükte çözülmesi gerekliliğidir (toplam maliyet yaklaşık 2 kat).
+
+\subsection{Parametre Taraması Problemi}
+Bir mühendislik probleminde genellikle farklı $\Rey$, $\Ray$, geometri ve sınır koşulları kombinasyonları test edilir. Her bir durum için ayrı simülasyon gerekir. 100 farklı parametre kombinasyonu $\times$ simülasyon başına 10 saat = 1000 saat GPU zamanı.
+
+\subsection{Genelleştirme Eksikliği}
+Bir CFD simülasyonu yalnızca çözüldüğü parametrelerde geçerlidir. $\Rey = 5000$ için çözüm yapıldıysa, $\Rey = 5500$ için sıfırdan tekrar çözmek gerekir. Parametreler arasında ``interpolasyon'' yapma yeteneği yoktur.
+
+
+\section{Neural Operator Yaklaşımı: Neden?}
+\label{sec:neden_neural}
+
+Neural operator'lar, yukarıdaki sınırlamaların üstesinden gelmeyi hedefler:
+
+\begin{enumerate}
+    \item \textbf{Hız:} Eğitim maliyetli olabilir, ancak eğitilmiş model saniyeler içinde çözüm üretir. Parametre taraması böylece pratik hale gelir.
+
+    \item \textbf{Genelleştirme:} Farklı $\Rey$ ve $\Ray$ değerlerinde eğitilen model, görmediği ara değerlere interpolasyon yapabilir.
+
+    \item \textbf{Fizik-tabanlı eğitim:} Klasik neural network'lerden farklı olarak, fizik denklemlerini loss fonksiyonuna gömmek mümkündür. Böylece DNS verisi bile gerekmeyebilir.
+\end{enumerate}
+
+Bu projede kullanılan \textbf{INNATE} (Interpretable Neural Network Architecture for Turbulence Emulation) yaklaşımı bir adım daha ileri gider:
+\begin{itemize}
+    \item Her nöron bir \textit{fiziksel operatör}dür (adveksiyon, difüzyon, projeksiyon, kaldırma kuvveti\ldots).
+    \item Öğrenilebilir parametreler fiziksel anlama sahiptir ($\nu_{\text{eff}}$, $\beta_{\text{eff}}$ gibi).
+    \item Model, ``kara kutu'' değil, ``yorumlanabilir'' (interpretable) bir yapıya sahiptir.
+    \item MLP katmanları yoktur; yüzlerce fizik nöronu ağı oluşturur.
+\end{itemize}
+
+
+\section{Bu Projenin Kapsamı}
+\label{sec:kapsam}
+
+Bu bitirme projesi, INNATE kullanarak 3B mixed convection akışının modellenmesini hedefler. Spesifik olarak:
+
+\begin{itemize}
+    \item \textbf{Geometri:} Periyodik kutu, boyutlar $L_x \times L_y \times L_z = 6H \times 10H \times 4H$.
+    \item \textbf{Sürücüler:}
+    \begin{itemize}
+        \item Rüzgâr etkisi: Kolmogorov body forcing $\vect{F} = A \sin(k_f y)\,\hat{\vect{e}}_x$.
+        \item Sıcaklık farkı: Alt yüzey $T_h$ (sıcak), üst yüzey $T_c$ (soğuk).
+    \end{itemize}
+    \item \textbf{Parametre uzayı:} $\Rey = 5000$--$10{,}000$, \; $\Ray = 10^5$--$10^7$, \; $\Pran = 0.71$ (hava).
+    \item \textbf{Yaklaşım:} Boussinesq yaklaşımı (küçük sıcaklık farkları).
+    \item \textbf{Model:} INNATE --- saf fizik nöronlarından oluşan neural operator (MLP yok).
+    \item \textbf{Eğitim:} Physics-only loss (DNS verisi gerekmez).
+\end{itemize}
+
+
+\section{Ders Notunun Organizasyonu}
+\label{sec:organizasyon}
+
+Bu ders notu, problemi temelden ileri seviyeye kadar sistematik biçimde anlatır:
+
+\begin{description}
+    \item[Bölüm 2 -- Akışkanlar Dinamiği Temelleri:] Süreklilik, Navier--Stokes ve enerji denklemlerinin adım adım türetilmesi.
+
+    \item[Bölüm 3 -- Boyutsuz Analiz:] Denklemlerin boyutsuzlaştırılması; $\Rey$, $\Ray$, $\Pran$, $\Rich$, $\Nus$ sayılarının türetilmesi ve fiziksel anlamları.
+
+    \item[Bölüm 4 -- Boussinesq Yaklaşımı ve Konveksiyon:] Boussinesq denklemlerinin türetilmesi; Rayleigh--B\'{e}nard, zorlanmış ve mixed konveksiyon.
+
+    \item[Bölüm 5 -- Spektral Yöntemler:] Fourier dönüşümü, spektral türev, FFT, de-aliasing.
+
+    \item[Bölüm 6 -- Türbülans ve LES:] Kolmogorov teorisi, enerji kaskadı, LES ve Smagorinsky modeli.
+
+    \item[Bölüm 7 -- Neural Operator'lar:] PINN, FNO, DeepONet ve INNATE konseptleri.
+
+    \item[Bölüm 8 -- Bizim Problemimiz:] 3B mixed convection probleminin detaylı tanımı.
+
+    \item[Bölüm 9 -- INNATE Mimarisi:] Nöron tipleri, ağ yapısı, öğrenilebilir parametreler.
+
+    \item[Bölüm 10 -- Training Stratejisi:] Loss fonksiyonları, curriculum learning, parametre sweep.
+
+    \item[Bölüm 11 -- DNS Referans ve Validasyon:] Pseudo-spectral DNS, validasyon metrikleri.
+
+    \item[Bölüm 12 -- Beklenen Sonuçlar:] Farklı rejimlerde akış yapıları ve başarı kriterleri.
+\end{description}
+
+\begin{remark}
+Bu ders notu, lisans düzeyinde akışkanlar dinamiği bilgisini varsayar (süreklilik ve NS denklemlerinin var oldugunu bilmek yeterli; türetmeyi burada yapacağız). Lineer cebir ve temel diferansiyel denklem bilgisi gereklidir.
+\end{remark}

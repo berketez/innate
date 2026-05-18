@@ -1,0 +1,594 @@
+% ============================================================
+% Bölüm 11: Karşılaşılan Buglar ve Çözümleri
+% ============================================================
+
+\chapter{Karşılaşılan Buglar ve Çözümleri}
+\label{ch:buglar}
+
+Bu bölüm, INNATE projesinin yaklaşık üç ay süren geliştirme döneminde karşılaşılan sekiz kritik hatayı ve bunların nasıl teşhis edilip çözüldüğünü kronolojik olarak ele alır. Bilimsel yazımda genellikle yalnızca \textit{nihai sonuç} aktarılır; başarısız denemeler, yanlış teşhisler ve geri alınan kararlar gizlenir. Oysa bir lisans tezinin asıl katkısı, yapılan deneylerin niceliğinden çok, bu deneylerden çıkarılan derslerdedir. Bu nedenle bölüm boyunca her bug için aynı şablon kullanılacaktır:
+
+\begin{enumerate}
+    \item \textbf{Belirti:} Modelin ürettiği gözlemlenebilir hata (NaN, ıraksak loss, fiziksel olarak yanlış metrik).
+    \item \textbf{Tanı:} Hatanın nasıl izole edildiği; hangi loglar, hangi araçlar, hangi ablation çalışmaları kullanıldı.
+    \item \textbf{Kök neden:} Fizik, sayısal yöntem veya makine öğrenmesi açısından yapısal açıklama.
+    \item \textbf{Çözüm:} Uygulanan kod/parametre/mimari değişiklik.
+    \item \textbf{Öğrenilen ders:} Aynı problemin gelecekte tekrarlanmaması için sıkıştırılmış bir kıssadan hisse.
+\end{enumerate}
+
+Bu sekiz hatadan üçü makine öğrenmesi karakterinde (loss tasarımı, mimari coupling, optimizer davranışı), ikisi sayısal analiz karakterinde (CFL, von Neumann), biri yazılım altyapısı (\texttt{torch.compile}), biri fizik-tabanlı integrasyon (TBPTT-rollout uyumsuzluğu) ve sonuncusu kapasite-aktivasyon dengesizliği üzerinedir. Hepsi birlikte, ``saf-fizik nöral CFD'' yaklaşımının pratik sınırlarını çizen bir harita oluşturur.
+
+
+% ============================================================
+\section{Amplitude Pumping --- Loss Çatışması ve Metrik Sömürüsü}
+\label{sec:bug_amplitude_pumping}
+
+\paragraph{Tarih:} Mart 2026 sonu, \texttt{INNATE v2} eğitimleri.
+
+\subsection*{Belirti}
+
+Modelin ürettiği hız alanı incelendiğinde, hacim-ortalama kinetik enerjinin (\,$\langle |\vect{u}|^2 \rangle / 2$\,) beklenenden \textit{anormal} biçimde yüksek seyrettiği gözlendi. Spektrum eğimi $-5/3$'ten uzak (ortalama $-2.4$ civarı), ancak toplam TKE referans LES'in bazı durumlarda iki katına ulaşıyordu. Yani enerji vardı, fakat doğru ölçeklerde \textit{değildi}: büyük ölçekli yapılar şişmiş, inertial range yok olmuştu. Bu durum literatürde ``amplitude pumping'' (genlik şişirme) olarak bilinen bir tür metrik sömürüsünün (\textit{metric hacking}) klasik tezahürüydü.
+
+\subsection*{Tanı}
+
+İlk eğitim koşusunda yedi loss fonksiyonu (Bölüm \ref{ch:training}) bulunuyordu; ancak iterasyonlar sırasında problem-spesifik düzeltmeler için bu sayı 27'ye çıkmıştı. \texttt{anti\_laminar} ve \texttt{tke\_ref} olarak adlandırılan iki ek loss, modelin laminer bir çözüme yakınsamasını engellemek üzere tasarlanmıştı:
+
+\begin{equation}
+    \mathcal{L}_{\text{anti-lam}} = \mathrm{ReLU}\!\left( \mathrm{TKE}_{\min} - \langle |\vect{u}'|^2 \rangle \right)^2,
+    \qquad
+    \mathcal{L}_{\text{tke-ref}} = \left( \log \mathrm{TKE} - \log \mathrm{TKE}_{\text{LES}} \right)^2.
+\end{equation}
+
+Ablation deneyinde bu iki loss tek tek kapatıldığında modelin TKE'si referans LES değerine \textit{aşağıdan} yaklaşıyor, ancak Cs ve $\kappa$ MLP başlığı (\texttt{PhysicsModulator}) negatif Smagorinsky katsayısı üretmeye başlıyordu: $\mathrm{Cs} \approx -0.04$. Eddy viscosity'nin negatif olması, fiziksel olarak \textit{geri-saçılım} (backscatter) anlamına gelir; ancak burada bu fenomen değil, optimizerın loss yüzeyinde keşfettiği bir \textit{kestirme yol} idi. Codex danışmanlığı (2026-04-02) bu davranışı şöyle özetledi: ``Loss \texttt{tke\_ref} eksi yönlü kapanırsa, $\nu_t$'yi negatife çek; $\mathrm{TKE}$ otomatik şişer. Optimizer fiziksel anlam aramaz, gradient takip eder.''
+
+\subsection*{Kök neden}
+
+Sorun, loss fonksiyonlarının çelişik kısıtlar dayatmasıydı. Yedi temel loss (Bölüm \ref{ch:training}) zaten \textit{kapalı} bir bütçe denklemi tanımlıyordu. Ek loss'lar bu kapalı sistemin üzerine yamandığında, optimizer iki gradyan vektörünün dengelendiği patolojik bir minimum buluyordu:
+
+\begin{equation}
+    \nabla_\theta \mathcal{L}_{\text{tke-ref}} \;\approx\; -\,\nabla_\theta \mathcal{L}_{\text{spectrum}},
+\end{equation}
+
+yani spektrumu düzeltmenin maliyeti TKE'yi düşürmek olduğu için, model her ikisini de optimize edemiyor; hem TKE hem spektrum için \textit{ortalama bir uzlaşma} bulamıyordu. Kapasitesi sınırlı bir modelin (Cs/$\kappa$ MLP'sinin yalnızca 28 trainable parametresi vardı), bu çelişkiyi çözmek yerine en kolay kestirme yolu (negatif viskozite) tercih etmesi beklendik bir davranıştı.
+
+\subsection*{Çözüm}
+
+27 Nisan -- 29 Nisan 2026 arasında üç katmanlı bir mimari müdahale uygulandı:
+
+\begin{itemize}
+    \item \textbf{Tier 1 --- Kanonik parametreler dondurma:} INNATE nöronlarındaki 120 fiziksel parametre (\texttt{buoyancy\_strength}, \texttt{advection\_modulator}, \texttt{forcing.amplitude}, $\ldots$) literatürdeki kanonik değerleriyle (1.0) sabitlendi. Bu parametrelerin trainable olması, modelin fiziği değil ``sayıları'' optimize etmesine neden oluyordu.
+    \item \textbf{Tier 2 --- PDE residual loss eklendi:} Boussinesq denklemlerinin yerel residual'ı doğrudan loss'a yazıldı:
+    \begin{equation}
+        \mathcal{L}_{\text{NS-res}} = \left\| \pd{\vect{u}}{t} + (\vect{u}\cdot\gradient)\vect{u} + \gradient p - \frac{1}{\Rey}\laplacian\vect{u} - \Rich\,T'\,\hat{\vect{e}}_z \right\|_2^2,
+    \end{equation}
+    \begin{equation}
+        \mathcal{L}_{\text{th-res}} = \left\| \pd{T'}{t} + (\vect{u}\cdot\gradient)T' - \frac{1}{\Rey \Pran}\laplacian T' \right\|_2^2.
+    \end{equation}
+    Bu iki residual, loss yüzeyindeki kestirme yolları kapatır: ``negatif $\nu_t$'' artık residual'ı şişirir, dolayısıyla optimizer için cazip olmaktan çıkar.
+    \item \textbf{Tier 3 --- Loss minimalizasyonu:} 27 loss, fiziksel olarak \textit{bağımsız} 5 temele indirildi:
+    $\mathcal{L}_{\text{NS-res}}$, $\mathcal{L}_{\text{th-res}}$, $\mathcal{L}_{\text{div}}$, $\mathcal{L}_{\text{corr}}$ (uzun-zamanlı korelasyon), $\mathcal{L}_{\text{spec}}$ (yalnızca \textit{eğim}, genlik değil).
+\end{itemize}
+
+\textbf{Önemli bir alt-detay:} $\mathcal{L}_{\text{spec}}$ yalnızca spektrumun \textit{şeklini} (eğimini) cezalandıracak biçimde formüle edildi:
+
+\begin{equation}
+    \mathcal{L}_{\text{spec-shape}} = \left\| \frac{d}{d\log k}\log E_{\text{model}}(k) - \frac{d}{d\log k}\log E_{\text{LES}}(k) \right\|_2^2 \quad (k \in [k_{\text{IR-min}}, k_{\text{IR-max}}]),
+\end{equation}
+
+böylece TKE'nin mutlak değeri spektrum loss'undan etkilenmez; mutlak değer yalnızca residual'lar tarafından belirlenir.
+
+\subsection*{Öğrenilen ders}
+
+\begin{remark}
+\textit{Loss çatışması, kapasitesi düşük modellerde her zaman metrik sömürüsüne yol açar. Çok sayıda ağırlıklandırılmış loss, az sayıda fiziksel-bağımsız loss'tan \textbf{daha kötüdür}: gradient yönünü belirsizleştirir ve optimizera kestirme yol arama fırsatı sunar. Eğer iki loss aynı niceliği farklı yollardan ölçüyorsa, biri gereksizdir; aynı niceliği farklı yönlerde itiyorsa, en azından biri yanlıştır.}
+\end{remark}
+
+
+% ============================================================
+\section{MLP Çıkış Başlığının Ayrıştırılması --- Reynolds Analojisinin Kırılması}
+\label{sec:bug_mlp_split}
+
+\paragraph{Tarih:} 17--18 Nisan 2026.
+
+\subsection*{Belirti}
+
+Modelin termal alt-grid kapanışı (\texttt{kappa\_t}) eğitim sırasında neredeyse sıfıra (\,$\kappa_t / \kappa \approx 10^{-2}$\,) düştü. Sonuç olarak Nusselt sayısı LES referansından çok aşağıda kaldı (Nu $\approx 8$, LES'in $\approx 39$). Momentum SGS (\,$\nu_t$\,) ise makul aralıkta kalmaya devam etti. Bu durum, modelin termal türbülansı ``kapatıp'' yalnızca momentum türbülansını öğrendiği bir asimetri ortaya çıkardı.
+
+\subsection*{Tanı}
+
+\texttt{PhysicsModulator} sınıfının ileri yayılım kodu incelendiğinde, MLP çıkış başlığının (\texttt{fc2}) iki ayrı doğrusal projeksiyon kullandığı görüldü:
+
+\begin{lstlisting}[language=Python,caption={MLP çıkış başlığı: ayrılmış (hatalı) versiyon}]
+# Kapsule tani: ayrik baslik
+self.fc2_cs    = nn.Linear(hidden, 1, bias=True)   # Cs(x,y,z) icin
+self.fc2_kappa = nn.Linear(hidden, 1, bias=True)   # kappa_coeff(x,y,z) icin
+
+# ileri yayilim
+h = self.act(self.fc1(features))
+log_cs    = self.fc2_cs(h).squeeze(-1)             # bagimsiz cikti
+log_kappa = self.fc2_kappa(h).squeeze(-1)          # bagimsiz cikti
+\end{lstlisting}
+
+Eğitim boyunca \texttt{fc2\_kappa.weight}'in normu izlendiğinde, modelin bu başlığı \textit{aktif olarak öldürdüğü} ortaya çıktı: ağırlıklar logaritmik olarak küçülerek \texttt{kappa\_coeff} çıktısını taban değer olan $0.01$'e yapıştırıyordu. CFD-expert ajanı bu davranışı ``Reynolds analojisinin kırılması'' olarak etiketledi.
+
+\subsection*{Kök neden}
+
+Klasik LES kapanışında momentum ve termal eddy diffusivity'ler türbülanslı Prandtl sayısı $\Pran_t$ üzerinden \textit{yapısal olarak kuplajlıdır}:
+
+\begin{equation}
+    \kappa_t = \frac{\nu_t}{\Pran_t}, \qquad \Pran_t \approx 0.7\text{--}1.0 \text{ (mixed convection)}.
+    \label{eq:reynolds_analogy}
+\end{equation}
+
+Bu denklem yalnızca pratik bir yaklaşım değil; aynı zamanda momentum ve ısı taşınımının aynı eddy yapıları tarafından yapıldığını söyleyen \textit{Reynolds analojisinin} ifadesidir. MLP başlığını ayırmak, optimizera ``$\nu_t$ ve $\kappa_t$ birbirinden bağımsızdır'' demek anlamına geliyordu. Loss yüzeyinde $\kappa_t \to 0$, $\nu_t > 0$ kombinasyonu, termal residual'ı kısa vadede düşürmenin (yüksek difüzyon olmadığı için $T'$ alanı daha az pürüzlü) bir kestirme yoluydu --- aynı bir önceki bölümdeki metrik sömürüsünün bir varyantı.
+
+\subsection*{Çözüm}
+
+MLP yapısı yeniden birleştirildi ve $\Pran_t$ \textit{öğrenilebilir tek bir log-skaler} olarak tanımlandı:
+
+\begin{lstlisting}[language=Python,caption={Yapısal Reynolds analojisi: birleşik başlık}]
+# Reynolds analojisi: tek baslik + log-Pr_t
+self.fc2_cs        = nn.Linear(hidden, 1, bias=True)            # Cs(x,y,z)
+self.log_inv_Pr_t  = nn.Parameter(torch.zeros(1))               # log(1/Pr_t)
+
+# ileri yayilim
+log_cs   = self.fc2_cs(self.act(self.fc1(features))).squeeze(-1)
+Cs       = torch.exp(log_cs).clamp(min=1e-3, max=0.3)
+nu_t     = (Cs * delta) ** 2 * S_mag
+kappa_t  = nu_t * torch.exp(self.log_inv_Pr_t)                  # yapisal kuplaj
+\end{lstlisting}
+
+Bu mimaride $\Pran_t$ uzaysal olarak sabittir (literatürde bu yaygın bir varsayımdır), ancak değeri öğrenilebilir. Eğitim sonunda gözlenen değer $\Pran_t \approx 0.85$ olup mixed convection literatürüyle uyumludur.
+
+\subsection*{Öğrenilen ders}
+
+\begin{remark}
+\textit{Fizik-tabanlı modellerde mimari serbestliği `daha çok parametre, daha çok ifade gücü' olarak yorumlamak yanıltıcıdır. Yapısal kısıtlar (Reynolds analojisi, Galilei değişmezliği, enerji korunumu) modelin geometrisinin parçasıdır; bunları kırmak ifade gücünü değil, yanlış-yönlendirilmiş ifade gücünü artırır. ``Daha az parametre ile aynı fiziği zorla'' her zaman ``daha çok parametre ile fiziği umursama''dan üstündür.}
+\end{remark}
+
+
+% ============================================================
+\section{Curriculum Geçişinde Gradyan Patlaması}
+\label{sec:bug_grad_spike}
+
+\paragraph{Tarih:} Nisan 2026 sonu -- Mayıs 2026 başı.
+
+\subsection*{Belirti}
+
+Curriculum learning şeması (Bölüm \ref{ch:training}) Phase A'da yalnızca $\Rey = 7000$ örneklerini, Phase B'de $\Rey \in \{7000,\,10000\}$ karışımını, Phase C'de ise tam aralığı kullanıyordu. Phase A $\to$ Phase B geçişinde \texttt{grad\_norm} bir adımda 1.4'ten \textbf{8282}'ye sıçradı (yaklaşık 5900 katı). Eğitim NaN'a düşmedi (gradient clipping aktifti), ancak Adam'ın momentum ortalamaları bozuldu ve sonraki 5--7 epoch'ta loss platosu yaşandı.
+
+\subsection*{Tanı}
+
+Üç ardışık checkpoint'in optimizer state'i karşılaştırıldı (\texttt{torch.save(opt.state\_dict())}). \texttt{exp\_avg} (Adam'ın birinci momenti) ve \texttt{exp\_avg\_sq} (ikinci moment) Phase A boyunca düşük varyanslıydı. Phase B'ye geçişte yeni $\Rey = 10000$ örnekleri devreye girince, \texttt{exp\_avg\_sq} değerleri eski (Phase A'ya uygun) momentum sayısıyla normalize edilmeye devam etti. Bu durum, \textit{aynı} loss değişimine karşı orantısız büyük adım atılmasına yol açtı.
+
+İkinci faktör, loss ağırlıklarının lineer interpolasyon ile aynı epoch içinde değişiyor olmasıydı (\texttt{WEIGHTS\_A} $\to$ \texttt{WEIGHTS\_B}, ramp 1 epoch). Codex danışmanlığı (2026-05-01) ``aynı optimizer step'inde hem veri dağılımı hem loss yüzeyi değiştiği için, Adam'ın mom-2'si sapıyor'' sonucuna vardı.
+
+\subsection*{Kök neden}
+
+Adam optimizer'ın güncelleme kuralı:
+\begin{equation}
+    \theta_{t+1} = \theta_t - \eta \cdot \frac{\hat{m}_t}{\sqrt{\hat{v}_t} + \epsilon},
+\end{equation}
+burada $\hat{m}_t$ ve $\hat{v}_t$ üstel hareketli ortalamalardır ($\beta_1 = 0.9, \beta_2 = 0.999$). Bu ortalamalar yaklaşık $1/(1-\beta_2) = 1000$ adım pencereyi temsil eder. Eğer veri dağılımı veya loss yüzeyi bu pencereden çok daha kısa zamanda değişirse, \,$\hat{v}_t$ ``eski'' yüzeyi yansıtmaya devam eder ve yeni gradyanlar bu eski normalizasyonla çarpılır $\Rightarrow$ patlama.
+
+\subsection*{Çözüm}
+
+Üç paralel müdahale uygulandı:
+\begin{enumerate}
+    \item \textbf{Loss ramp süresi 1 $\to$ 5 epoch:} Loss ağırlıkları beş epoch boyunca cosine ile yumuşatıldı.
+    \item \textbf{Phase A süresi 30 $\to$ 50 epoch:} Daha uzun Phase A, optimizer'a kararlı bir ``temel'' kurma şansı verdi.
+    \item \textbf{Geçişte LR warm-down:} Phase B'nin ilk 3 epoch'unda öğrenme oranı $\eta \times 0.5$ uygulandı; bu süre içinde \,$\hat{v}_t$ yeniden kalibre oldu.
+\end{enumerate}
+
+Bu üç değişiklik sonrası \texttt{grad\_norm} geçişte en fazla 4.0'a çıktı (önceki 8282 yerine), ve sonraki epoch'larda 1.5--2.0 bandına döndü.
+
+\subsection*{Öğrenilen ders}
+
+\begin{remark}
+\textit{Curriculum learning'de ``aşamalar arası geçiş'' bir veri-augmentation değişikliği olarak değil, \textbf{loss yüzeyinin topolojik değişikliği} olarak ele alınmalıdır. Adam'ın momentum penceresinden ($\sim 1000$ adım) daha kısa süreli ani değişiklikler optimizer state'ini bozar. Geçişlerde ya yumuşatma uygulanmalı ya da momentum sıfırlanmalıdır.}
+\end{remark}
+
+
+% ============================================================
+\section{Phase C Iraksaması --- Üç Eşzamanlı Şokun Birleşimi}
+\label{sec:bug_phase_c}
+
+\paragraph{Tarih:} 8 Mayıs 2026 (en uzun ve en zor teşhis edilen bug).
+
+\subsection*{Belirti}
+
+Phase C'ye geçişten 40 epoch sonra, model birden ıraksamaya başladı. Ardışık 3 epoch'ta gözlenen metrikler şöyleydi:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcccc}
+\toprule
+Epoch & TKE & $|\vect{u}|_{\max}$ & Nu & $\nabla \cdot \vect{u}$ \\
+\midrule
+$E$        & 0.0078 & 0.81 & 182 & $5\cdot10^{-4}$ \\
+$E+1$      & 0.0142 & 0.96 & 121 & $2\cdot10^{-3}$ \\
+$E+2$      & 0.0223 & 1.27 &  49 & $7\cdot10^{-3}$ \\
+$E+3$      & NaN   & NaN & NaN & NaN \\
+\bottomrule
+\end{tabular}
+\caption{Phase C ıraksamasının epoch-bazlı seyri.}
+\end{table}
+
+Iraksamanın özelliği klasik bir ``patlama'' olmamasıydı: loss kademeli olarak artıyordu, divergence kontrol sınırlarını aşıyor, Nusselt sayısı çöküyor, fakat bunların hangisinin önce, hangisinin sonra olduğu net değildi.
+
+\subsection*{Tanı}
+
+İlk üç hipotez yanlış çıktı:
+\begin{itemize}
+    \item ``Yeni $\Rey$ örnekleri çok zorlu''---fakat aynı $\Rey$ değerleri Phase B sonunda zaten kullanılıyordu.
+    \item ``Loss weight değişimi''---ramp uygulanmıştı.
+    \item ``Optimizer state'i bozuk''---bir önceki epoch'un checkpoint'i ile devam edildiğinde aynı sorun yine ortaya çıktı.
+\end{itemize}
+
+Çözücü değişiklik logu (\texttt{git log -- train.py model.py}) Phase A başlangıcından itibaren satır-satır incelendiğinde, üç eşzamanlı değişiklik tespit edildi:
+
+\begin{enumerate}
+    \item \textbf{Loss ağırlık jump'ı:} \texttt{WEIGHTS\_A} (toplam $\sum w = 50$) ile \texttt{WEIGHTS\_C} (toplam $\sum w = 68$) arasında \%36'lık bir ağırlık artışı vardı. Ramp uygulanmıştı, ancak son ağırlık vektörü Phase B'dekinden farklıydı.
+    \item \textbf{Forcing UNFREEZE bug'ı:} \texttt{train.py} içinde Tier-2 müdahalesinden kalan eski bir kod bloğu, Phase C'ye girişte \texttt{forcing.amplitude} parametresini yeniden trainable yapıyordu (\texttt{requires\_grad = True}). Bu, dondurulmuş parametre listesinin sessizce 67'den 68'e çıkmasına neden oldu.
+    \item \textbf{$\Rey = 10000$ örneklerinin frekans artışı:} Phase B'de $\Rey \in \{7000, 10000\}$ stratified round-robin ile alterneliyordu; Phase C'ye geçişte aynı tablo korundu fakat ağırlık matrisi sıkılaştığı için $\Rey = 10000$ kanalındaki yüksek-genlik adveksiyon terimleri (daha düşük $\nu$, daha agresif kaskad) orantısız bir basınç oluşturdu.
+\end{enumerate}
+
+Üç faktör tek tek ele alındığında her biri \textit{tolere edilebilirdi}; ancak \textbf{eşzamanlı} oluşmaları altında-aktive (under-actuated) optimizer'ın çözüm noktasını kaybetmesine yol açtı. Codex danışmanlığı bu durumu ``simultaneous shock''---``tek faktörü izole edip diğerlerini sabit tutarak tekrar koş''---olarak özetledi.
+
+\subsection*{Kök neden}
+
+Optimizer'ın 68 trainable parametresi vardı; bu sayı, Bölüm \ref{sec:bug_undercapacity}'de ele alacağımız kapasite-aktivasyon dengesizliğinin tam ortasında bir değerdi. ``Yeterli'' loss yüzeyini takip edebilecek kadar parametre yoktu; üç eşzamanlı değişiklik, optimizer'ın yerel \textit{gradyan-sıfır} havzasını terk etmesine ve geri dönemeyeceği yüksek-loss bir bölgeye sürüklenmesine neden oldu. Bu, klasik anlamda bir ``divergence'' değil, çok-değişkenli bir \textit{loss-yüzeyi sürüklenmesidir}.
+
+\subsection*{Çözüm}
+
+Beş paralel düzeltme aynı anda devreye alındı:
+
+\paragraph{Fix 1 --- Forcing UNFREEZE bug'ının kaldırılması.} \texttt{train.py:1487-1502} arasındaki eski blok silindi; \texttt{--freeze-forcing} flag'i artık Phase C'de de geçerli.
+
+\paragraph{Fix 2 --- WEIGHTS\_C $\equiv$ WEIGHTS\_A.} İlk iterasyon koşusu için Phase C ağırlık vektörü Phase A ile aynı tutuldu (jump = 0). Eğer 30 epoch boyunca stabil kalırsa, sonraki iterasyonda kademeli ramp eklenebilir.
+
+\paragraph{Fix 3 --- Spectrum loss NaN-guard.} Spektrum loss'u içinde $\log E(k)$ alınıyordu; çok küçük $E(k)$ değerleri ($\sim 10^{-15}$) sayısal underflow ile $-\infty$ üretiyor, bu da gradyana NaN olarak yayılıyordu:
+\begin{lstlisting}[language=Python,caption={Spectrum loss NaN-guard}]
+# Eski:  loss_spec = ((torch.log(E_model) - torch.log(E_les))**2).mean()
+log_E_m  = torch.log(E_model.clamp(min=1e-12) + 1e-12)
+log_E_l  = torch.log(E_les.clamp(min=1e-12) + 1e-12)
+mask     = torch.isfinite(log_E_m) & torch.isfinite(log_E_l)
+loss_spec = ((log_E_m[mask] - log_E_l[mask])**2).mean()
+\end{lstlisting}
+
+\paragraph{Fix 4 --- MLP girişi clamp ve nan\_to\_num.} \texttt{PhysicsModulator}'a giriş özniteliklerinde (yerel $|S|$, $|T|$, $|\vect{u}|$, $\ldots$) out-of-distribution değerler için kıskaç:
+\begin{lstlisting}[language=Python]
+features = torch.nan_to_num(features, nan=0.0, posinf=10.0, neginf=-10.0)
+features = features.clamp(min=-10.0, max=10.0)
+\end{lstlisting}
+
+\paragraph{Fix 5 --- Resume optimizer reset + LR warm-up.} Iraksak checkpoint'ten devam ederken Adam'ın \texttt{exp\_avg} ve \texttt{exp\_avg\_sq} state'i sıfırlandı; ardından öğrenme oranı 3 epoch boyunca $\eta \times 0.25$ ile ısıtıldı.
+
+\subsection*{Cursor ajanı: paralel von Neumann analizi}
+
+Aynı tarihte (2026-05-08) Cursor IDE üzerinde çalışan bağımsız bir AI ajanı, problemi farklı bir açıdan ele aldı. Cursor ajanı eddy viscosity'nin yerel davranışını von Neumann stabilite analizi ile inceledi. Smagorinsky $\nu_t = (C_s \Delta)^2 |S|$ formülasyonunda, $|S|$'nin küçük olduğu noktalarda scale-similarity terimi devreye girip $\nu_t$'yi \textit{patlatabiliyordu}. Stabilite koşulu:
+
+\begin{equation}
+    \nu_t \cdot \Delta t \cdot k_{\max}^2 < 2.
+    \label{eq:vn_stability}
+\end{equation}
+
+Bu eşitsizliğin ihlal edildiği grid noktalarında çözücü lokal olarak ıraksıyordu. Cursor ajanın önerdiği çözüm, $\nu_t$ değerine üst-kıskaç eklemekti:
+
+\begin{equation}
+    \nu_t \;\leftarrow\; \min\!\left( \nu_t,\; \frac{2}{\Delta t \cdot k_{\max}^2} \right).
+    \label{eq:vn_cap}
+\end{equation}
+
+Bu çözüm, yukarıdaki beş fix'le \textit{tamamlayıcı} idi: fix'ler eğitim dinamiğini düzeltiyordu, von Neumann kıskacı çözücünün lokal stabilitesini garanti ediyordu. İkisi birlikte uygulandığında Phase C 200 epoch boyunca stabil kaldı.
+
+\subsection*{Öğrenilen ders}
+
+\begin{remark}
+\textit{Karmaşık eğitim hatalarında \textbf{tek-faktör izolasyonu} altın kuraldır. ``Üç şeyi aynı anda değiştirdim, hangisi suçlu?'' sorusu cevapsızdır; suçlu bulunamayınca yanlış teşhisler kabul edilir. İlk kararlı koşuyu \textit{her şeyi minimal değiştirerek} elde et, ardından her bir değişikliği tek tek geri ekleyerek hangisinin sınırı aştığını ölç.}
+\end{remark}
+
+
+% ============================================================
+\section{torch.compile Recompile Döngüsü}
+\label{sec:bug_torchcompile}
+
+\paragraph{Tarih:} 7 Mayıs 2026.
+
+\subsection*{Belirti}
+
+Eğitim koşusu epoch 40'a ulaştıktan sonra ilerlemeyi tamamen durdurdu. Terminal çıktısı 5--6 saat boyunca aynı kaldı; CPU/GPU kullanımı yüzde 100 civarında, bellek kullanımı kararlı, fakat hiçbir log çizgisi üretilmiyor. Hem Mac hem 4090 üzerinde aynı davranış gözlendi.
+
+\subsection*{Tanı}
+
+Berke, terminal scrollback'in son 68 KB'ını \texttt{sorun.txt} dosyasına kaydetti ve bu dosyayı analiz için sundu. İçerik onlarca tekrarlayan satırdı:
+
+\begin{lstlisting}[caption={sorun.txt'den alıntı (kısaltılmış)}]
+[INFO] torch._dynamo: Malformed guard: object has no attribute 'shape'
+[INFO] torch._dynamo: Recompiling function 'forward' (cache_id=147)
+[INFO] torch._dynamo: Malformed guard: object has no attribute 'shape'
+[INFO] torch._dynamo: Recompiling function 'forward' (cache_id=148)
+...
+KeyboardInterrupt
+  File "torch/_dynamo/eval_frame.py", line 655, in _convert_frame
+    ...
+\end{lstlisting}
+
+Eğitim kodunun \texttt{train.py:2132-2161} arasında modelin \texttt{torch.compile} ile sarmalandığı görüldü:
+
+\begin{lstlisting}[language=Python,caption={Sorunlu compile çağrısı}]
+model = torch.compile(
+    model,
+    mode      = "reduce-overhead",
+    fullgraph = False,
+    dynamic   = False,
+)
+\end{lstlisting}
+
+\subsection*{Kök neden}
+
+Üç ayar birlikte patolojik bir kombinasyon oluşturuyordu:
+\begin{itemize}
+    \item \texttt{mode="reduce-overhead"}: CUDA graph kullanır; bu, tensor stride'larının değişmemesini gerektirir. INNATE'in spectral projeksiyonları FFT sonrası farklı stride'larla çıktı üretiyordu.
+    \item \texttt{fullgraph=False}: Python kontrol akışına izin verir, ancak bu durumda her \texttt{if} ifadesi bir ``graph break'' yaratır.
+    \item \texttt{dynamic=False}: Şekiller statik kabul edilir; herhangi bir şekil değişikliği yeniden derleme tetikler.
+\end{itemize}
+
+Modelin \texttt{model.py:494}'teki şu satırı kritikti:
+\begin{lstlisting}[language=Python]
+if self._tke_ref > 0:
+    forcing_target = self._tke_ref
+else:
+    forcing_target = torch.mean(...)
+\end{lstlisting}
+
+Her iki dal da farklı tipte tensor üretiyordu (skaler vs. tensor), Dynamo bunu graph break olarak işaretliyor, ardından yeniden derleme başlatıyordu. Cache zamanla bozuldu, ``Malformed guard'' uyarıları belirdi ve sistem sonsuz bir derleme--bozulma--yeniden derleme döngüsüne girdi.
+
+\subsection*{Çözüm}
+
+\texttt{torch.compile} bloğu tamamen kaldırıldı; model eager-mode'da çalıştırılır:
+
+\begin{lstlisting}[language=Python,caption={Eager mode zorunlu}]
+# torch.compile KULLANILMIYOR -- bkz. Bug Bolumu 11.5
+# Performans kaybi: ~5dk/epoch -> ~20dk/epoch (4x).
+# Stabilite > hiz karari.
+\end{lstlisting}
+
+Hız kaybı yaklaşık 4 katı (5 dk/epoch $\to$ 20 dk/epoch) ölçüldü. Bu kabul edildi; çünkü eğitim toplamda $\sim 200$ epoch sürüyor (rakamla yaklaşık 60 saat) ve 5-6 saatlik askıda-kalma riski hız kazancından daha pahalıydı.
+
+\subsection*{Öğrenilen ders}
+
+\begin{remark}
+\textit{\texttt{torch.compile}, basit ve homojen forward pass'ler için harika bir araçtır. INNATE gibi koşullu dallanma içeren, FFT/IFFT geçişleri yapan ve farklı tensor şekilleri üreten karmaşık fizik modellerinde, derleyicinin ürettiği kazanç (ortalama 2-3x) sürdürülemezdir. Stabilite, ölçülebilir hızdan üstündür: 4x yavaş ama deterministik bir koşu, 2x hızlı ama ara sıra 6 saat askıda kalan bir koşudan iyidir.}
+\end{remark}
+
+
+% ============================================================
+\section{CFL İhlali --- Donanıma Bağlı Default'lar}
+\label{sec:bug_cfl}
+
+\paragraph{Tarih:} 6 Mayıs 2026.
+
+\subsection*{Belirti}
+
+4090 GPU'da uzun rollout testleri (\,$> 200$ adım) NaN üretiyordu. Aynı kod Mac M-series üzerinde (smoke test'te 50 adım) sorunsuz çalışıyordu. Hata her zaman ``adım 259'' civarında patladı; mekanı sabit, zamanlaması neredeyse sabit.
+
+\subsection*{Tanı}
+
+İki ortamın komut satırı parametreleri karşılaştırıldı:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\toprule
+Ortam & Komut & \texttt{dt} \\
+\midrule
+Mac (smoke)   & \texttt{python train.py --dt 0.005 --steps 50}    & 0.005 \\
+4090 (uzun)   & \texttt{python train.py --steps 1000}              & 0.020 (default) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Mac koşusunda \texttt{--dt 0.005} flag'i açıkça verilmişken, 4090 koşusunda default değer ($0.020$) kullanılıyordu. Default değer, model geliştirilmeye başlanırken (Şubat 2026) seçilmişti; o zamandan beri model 20-katmanlı RK4 yapısına geçmişti.
+
+\subsection*{Kök neden}
+
+CFL koşulu, hız alanının grid hücresini bir adımda en fazla bir kez geçmesini gerektirir:
+
+\begin{equation}
+    \mathrm{CFL} = \frac{|\vect{u}|_{\max} \cdot \Delta t}{\Delta x} < 1.
+    \label{eq:cfl}
+\end{equation}
+
+INNATE'in mimarisinde 20 \textit{iç katman} vardı; her dış adım, $20$ ardışık iç adım uyguluyor (her biri kendi RK4 evresi ile). Yani efektif zaman adımı:
+\begin{equation}
+    \Delta t_{\text{eff}} = N_{\text{layer}} \cdot \Delta t_{\text{outer}} = 20 \cdot 0.020 = 0.4 \text{ zaman birimi.}
+\end{equation}
+
+Domain $L_x = 4$, grid $N_x = 64$ olduğundan $\Delta x = 0.0625$. Türbülans gelişip $|\vect{u}|_{\max} \to 0.4$ aşıldığında:
+\begin{equation}
+    \mathrm{CFL}_{\text{eff}} = \frac{0.4 \cdot 0.4}{0.0625} = 2.56 \quad \gg 1.
+\end{equation}
+
+Adım 259 civarında türbülansın yeterince geliştiği ve bu eşiğin aşıldığı belirlendi.
+
+\subsection*{Çözüm}
+
+İki seviyeli düzeltme:
+\begin{enumerate}
+    \item \textbf{Komut satırı zorunluluğu:} 4090 komut listesinde \texttt{--dt 0.005} flag'i varsayılan olarak yazıldı.
+    \item \textbf{Adaptif CFL kontrol:} Çözücü her dış adım sonunda CFL'yi hesaplar; 0.8'i aşarsa runtime hatası fırlatır:
+    \begin{lstlisting}[language=Python]
+cfl = u_max.item() * dt * n_layers / dx
+if cfl > 0.8:
+    raise RuntimeError(f"CFL ihlali: {cfl:.3f}, dt'yi dusur.")
+    \end{lstlisting}
+\end{enumerate}
+
+\subsection*{Öğrenilen ders}
+
+\begin{remark}
+\textit{Default değerlerine güvenmeyin. Özellikle bir kod taban geliştikçe (örneğin layer sayısı arttıkça), eski default'lar aniden \textit{geçersiz} hale gelir; ne yazık ki bu geçersizlik derleyici tarafından yakalanmaz, çünkü tip uyumludur. Her ortam değişikliğinde (yeni donanım, yeni model versiyonu) CFL gibi temel sayısal koşulların doğrulandığı kısa bir smoke test çalıştırılmalıdır.}
+\end{remark}
+
+
+% ============================================================
+\section{Eval-Time Drift --- TBPTT ile Rollout Arası Uyumsuzluk}
+\label{sec:bug_eval_drift}
+
+\paragraph{Tarih:} 8 Mayıs 2026.
+
+\subsection*{Belirti}
+
+Epoch 90'da elde edilen model checkpoint'i değerlendirildiğinde, \textit{eğitim sırasındaki} metrikler son derece umut vericiydi: TKE = 0.0080 (LES = 0.0085, fark $\sim \%6$), spektrum eğimi $-1.78$ (LES $-1.74$). Aynı checkpoint bağımsız bir 1000-adım rollout testine sokulduğunda, sonuçlar belirgin biçimde bozulmuştu: TKE = 0.0153 (\,$+\%80$\,), spektrum eğimi $-2.4$, Nu LES'in 4 katı.
+
+\subsection*{Tanı}
+
+Eğitim ve rollout iki farklı zamansal kısıtla çalışıyordu:
+\begin{itemize}
+    \item \textbf{Eğitim:} ``Truncated Backpropagation Through Time'' (TBPTT) ile yalnızca $T_{\text{trunc}} = 4$ adım geriye gradyan akışı vardı. Bu, modelin pratikte \textit{tek-adım sonrası tahminini} optimize ettiği anlamına geliyordu (kısa-zamanlı doğruluk).
+    \item \textbf{Rollout:} 1000 adım boyunca model kendi çıktısını girişine besler (autoregressive); küçük tek-adım hataları katlanarak büyür.
+\end{itemize}
+
+Hata-kümülasyonu oranı eğitim verilerinde ölçüldü: ortalama tek-adım L2 hatası $\epsilon_1 \approx 1.2 \cdot 10^{-3}$, ancak otokorelasyon zamanı $\tau_c \sim 50$ adım. 1000 adımlık bir rollout, $1000 / \tau_c = 20$ ``bağımsız'' hata kaynağı içeriyor; rastgele yürüyüş varsayımıyla beklenen kümülatif hata $\sqrt{20} \cdot \epsilon_1 \approx 5.4 \cdot 10^{-3}$, ölçülen drift ise yaklaşık 6.2$\cdot 10^{-3}$. İkisi tutarlı.
+
+\subsection*{Kök neden}
+
+TBPTT'nin temel takası şudur: $T_{\text{trunc}}$ küçük tutulduğunda bellek/zaman maliyeti azalır, ancak optimizer asla \textit{uzun-vadeli} davranışı doğrudan görmez. Model, $T_{\text{trunc}}$ sınırı içinde stabil kalmayı öğrenir; bu sınır dışındaki davranış ``öğrenilmemiş bir bölge''dir.
+
+Eğitim (\,$T_{\text{trunc}} = 4$\,) ile değerlendirme (rollout = 1000) arasındaki bu \textit{horizon gap}, INNATE'in aslında stabil değil \textit{kısa-vadeli stabil} olduğunu ortaya çıkardı.
+
+\subsection*{Çözüm}
+
+Üç adımlı düzeltme planlandı:
+\begin{enumerate}
+    \item \textbf{Kısa vade --- Eval'da rollout-zaman raporlama:} Tüm validasyon raporları artık iki ayrı sütun gösteriyor: ``training metrics'' (1-step) ve ``rollout metrics'' (1000-step). Bu, gelecekte ``çok iyi'' sonuçların hangi rejimde elde edildiğinin saklanmasını engelledi.
+    \item \textbf{Orta vade --- TBPTT ufkunun genişletilmesi:} \,$T_{\text{trunc}}$, $4 \to 16$ olarak artırıldı (4090 GPU belleği yeterli). Bu, gradyan hesaplama maliyetini doğrusal olarak artırır ($\sim 4\times$), ancak kümülatif hata büyümesinin gradyan-bilgisine doğrudan girmesini sağlar.
+    \item \textbf{Uzun vade --- v3 kapasite genişletmesi:} Bölüm \ref{sec:bug_undercapacity}'de tartışılacağı üzere, problem sadece TBPTT ile çözülemez; modelin rollout-stabilitesi için yeterli ifade gücüne (yeterli parametre sayısına) sahip olması gerekir.
+\end{enumerate}
+
+\subsection*{Öğrenilen ders}
+
+\begin{remark}
+\textit{Eğitim metrikleri ile değerlendirme metrikleri arasında \textbf{kategori farkı} vardır. Recurrent/autoregressive modellerde tek-adım doğruluğu, çok-adım stabilitesinin garantisi değildir. ``Train metric eşiği geçti'' demek, ``rollout test eşiği geçti'' demek değildir; her zaman iki metrik ayrı raporlanmalıdır.}
+\end{remark}
+
+
+% ============================================================
+\section{Kapasite Eksikliği --- Altında-Aktivasyon (Under-Actuation)}
+\label{sec:bug_undercapacity}
+
+\paragraph{Tarih:} Tüm proje boyunca tekrar tekrar gündeme gelen, ancak kabul edilmesi en zor olan bug.
+
+\subsection*{Belirti}
+
+Önceki yedi bölümdeki tüm fix'ler uygulandıktan sonra bile, sistem belirli bir performans tavanına çarpıyordu:
+\begin{table}[H]
+\centering
+\begin{tabular}{lcccc}
+\toprule
+Metrik & LES & INNATE & Hata oranı & Kabul? \\
+\midrule
+TKE             & 0.0085 & 0.0080 & $-\%6$  & \checkmark \\
+Spektrum eğimi  & $-1.74$ & $-2.89$ & $\Delta = 1.15$ & $\times$ \\
+Nusselt         & 39 & 156 & $\times 4.0$ & $\times$ \\
+$\theta'_{\text{rms}}$ & 0.0042 & 0.0167 & $\times 4.0$ & $\times$ \\
+\bottomrule
+\end{tabular}
+\caption{Tüm bug-fix'ler sonrası sistem tavanı (epoch 200, rollout 1000).}
+\end{table}
+
+TKE eşleşmesine rağmen, türbülans yapısı (spektrum şekli) ve termal taşınım (Nu, $\theta'_{\text{rms}}$) LES'ten 3-4 katı sapıyordu.
+
+\subsection*{Tanı}
+
+Modelin parametre dökümü:
+\begin{itemize}
+    \item Toplam parametre: 503
+    \item Trainable parametre: 68
+    \item Grid çözünürlüğü: $96 \times 160 \times 64$
+    \item Sistem serbestlik derecesi (DOF): $96 \cdot 160 \cdot 64 \cdot 4 = 3{,}932{,}160$
+    \item Parametre/DOF oranı: $68 / 3.93\,\mathrm{M} \approx 1{:}57\,800$
+\end{itemize}
+
+Karşılaştırma için: tipik FNO modelleri $\sim 10^5$ parametre kullanır, GNO modelleri $\sim 10^6$. INNATE'in 503 parametresi (\,$0.5\%$\,) literatürde gözlenen aralığın üç-dört kat altındaydı.
+
+Ablation: trainable parametre sayısı $68 \to 280$'e çıkarıldığında (sahte test, geçici Cs MLP genişletmesi), spektrum eğimi $-2.89 \to -2.10$'a, Nu hata oranı $\times 4.0 \to \times 1.8$'e düştü. Yani model \textit{daha fazla parametreden faydalanabiliyordu}, fakat orijinal tasarım kasıtlı olarak küçük tutulmuştu.
+
+\subsection*{Kök neden}
+
+Berke'nin 2026-02-18 tarihli mimari kararına göre proje, ``saf-fizik minimalist'' felsefesini benimsemişti: MLP modülatörleri kaldırılacak, fizik nöronları (Advection3D, Buoyancy3D, $\ldots$) ifade gücünü taşıyacak, model yorumlanabilir kalacak (Bölüm \ref{ch:innate_mimari}). Bu felsefe akademik açıdan değerli, fakat 3D mixed convection problemi için \textit{fazla agresif}'ti.
+
+Mixed convection literatüründeki tipik parametrik ölçek tahmini:
+\begin{equation}
+    N_{\text{params}} \;\sim\; \mathcal{O}\!\left( \log \mathrm{DOF} \cdot N_{\text{rejim}} \right),
+\end{equation}
+burada $N_{\text{rejim}}$, kapsanan rejim sayısı (laminar, transitional, türbülanslı + farklı $\Rey/\Ra$ kombinasyonları). $\log(3.93\,\mathrm{M}) \approx 15$, $N_{\text{rejim}} = 6$ ile $N_{\text{params}}^{\text{tahmin}} \sim 100$--$300$ trainable çıkar. INNATE'in 68 trainable parametresi bu alt sınırın da altındaydı; sistem ``altında-aktive'' (under-actuated) idi.
+
+Under-actuation, kontrol teorisindeki bir kavramdır: bir sistemin manipüle edilebilen serbestlik derecesi sayısı, yapması gereken bağımsız iş sayısından az ise, bazı işler \textit{yapılamaz}. Hangi iki metriği eşleştirirseniz eşleştirin (TKE, $\nabla \cdot \vect{u}$), kalan ikisi (Nu, spektrum eğimi) feda olur.
+
+\subsection*{Çözüm}
+
+Kapasite-aktivasyon dengesini düzeltmek için \texttt{INNATE v3 --- Saf-INNATE Spectral} mimarisi tasarlandı:
+
+\begin{itemize}
+    \item \textbf{MLP yok:} Felsefi devamlılık korundu; \texttt{PhysicsModulator} sınıfı tamamen kaldırıldı.
+    \item \textbf{Cs ve $\kappa_t$ uzaysal modülasyonu Fourier-mod katsayıları olarak öğrenilir:}
+    \begin{equation}
+        C_s(\vect{x}) = \overline{C_s} + \sum_{|\vect{k}| \leq K} \hat{C}_{\vect{k}} \, e^{i\vect{k}\cdot\vect{x}},
+    \end{equation}
+    burada $K = 8$ (her boyutta), trainable katsayı sayısı $\hat{C}_{\vect{k}} \in \mathbb{C}$, toplam $\sim 9000$. $\Pran_t$ yine tek bir log-skaler.
+    \item \textbf{Klasik Smagorinsky korunur:} Yerel $\nu_t = (C_s(\vect{x}) \Delta)^2 |S|$, yalnızca $C_s$ uzaysal varyans kazanır.
+\end{itemize}
+
+Yeni model 9905 parametreye sahip; parametre/DOF oranı $1{:}396$, literatür aralığına ($1{:}100$ -- $1{:}1000$) düşer. Erken ablation testlerinde Nu hata oranı $\times 1.4$, spektrum eğimi $-1.85$ ölçüldü; LES ile fark hâlâ var, fakat üçte birine indi.
+
+\subsection*{Öğrenilen ders}
+
+\begin{remark}
+\textit{``Az parametre'' bir mimari erdem değildir; bir mimari kısıttır. Akademik olarak savunulabilir ``saf-fizik minimalizm'', kapsadığı problem rejim sayısı ve hedef metrik çeşitliliği ile orantılı bir taban-parametre sayısı gerektirir. Bu tabanın altında, model kaçınılmaz olarak under-actuated kalır; hiçbir loss tasarımı, hiçbir curriculum stratejisi bu yapısal eksikliği dolduramaz. Hibrit yaklaşım --- \textbf{saf-fizik nöronlar + parametrik uzaysal modülasyon} --- ``minimalist'' ve ``yeterli'' arasındaki en sağlıklı dengedir.}
+\end{remark}
+
+
+% ============================================================
+\section{Bölüm Özeti ve Geriye Dönük Değerlendirme}
+\label{sec:bug_ozet}
+
+Bu bölümde sunulan sekiz bug, üç ay süren INNATE geliştirme döneminin tamamını kapsamayan, yalnızca kategorik açıdan farklı ve öğretici olanlarının bir seçkisidir. Tablo \ref{tab:bug_summary} bunları kategori, kaynak ve etki bazında özetler.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{p{3cm}p{3cm}p{4cm}p{3cm}}
+\toprule
+Bug & Kategori & Kök neden & Çözüm tipi \\
+\midrule
+11.1 Amplitude pumping       & ML/Loss        & Loss çelişmesi, metrik sömürüsü       & Mimari yeniden tasarım \\
+11.2 MLP fc2 split            & ML/Mimari      & Yapısal Reynolds analoji ihlali        & Mimari basitleştirme \\
+11.3 Grad spike (8282)        & ML/Optim.      & Adam momentum penceresi                & Curriculum yumuşatma \\
+11.4 Phase C ıraksaması       & ML + Numerik   & Üç eşzamanlı şok                       & 5+1 paralel fix \\
+11.5 \texttt{torch.compile}   & Yazılım altyp. & Recompile döngüsü                      & Eager mode'a geri dönüş \\
+11.6 CFL ihlali              & Numerik        & Donanım-bağlı default                  & Adaptif kontrol \\
+11.7 Eval drift               & ML/Eval.       & TBPTT-rollout horizon gap              & TBPTT genişletme \\
+11.8 Under-actuation          & Mimari/Kapasite& Saf-fizik minimalizm tabanı            & v3 yeniden tasarım \\
+\bottomrule
+\end{tabular}
+\caption{Sekiz kritik bug'ın özet tablosu.}
+\label{tab:bug_summary}
+\end{table}
+
+\textbf{Geriye dönük değerlendirme.} Bu sekiz bug'ın \textit{toplam}'ı, projenin başlangıçtaki temel hipotezi olan ``saf-fizik minimalist neural CFD'' yaklaşımının test edilmesini sağladı. Hipotezin teorik kısmı (fizik nöronları interpretable bir mimari oluşturur; PDE residual loss metric hacking'i engeller) doğrulandı. Hipotezin pratik kısmı (\,$< 100$ parametre 3D mixed convection için yeterlidir) çürütüldü: under-actuation bu kapasite seviyesinde \textit{yapısal} bir limit oluşturuyor. Bu çürütme bir başarısızlık değil; bilim felsefesi açısından net bir \textit{Popperci falsification}'dır ve gelecek çalışmalar için sağlam bir başlangıç noktası tanımlar.
+
+\textbf{AI ajan-katkıları.} Bu bölümde belgelenen birkaç çözüm, otonom çalışan AI ajanlarının doğrudan katkılarını içermektedir:
+\begin{itemize}
+    \item \textbf{Codex (GPT-5.5 xhigh):} 11.1, 11.3, 11.4 numaralı buglarda strateji ve teşhis önerileri (özellikle ``simultaneous shock'' formülasyonu, 2026-05-08).
+    \item \textbf{CFD-expert ajanı:} 11.2 numaralı bug'da Reynolds analoji ihlalinin tespiti.
+    \item \textbf{Cursor IDE ajanı:} 11.4 numaralı bug'da paralel von Neumann analizi ve $\nu_t$ üst-kıskaç önerisi.
+    \item \textbf{ML-expert ajanı:} 11.7 numaralı bug'da TBPTT-rollout uyumsuzluğunun matematiksel formülasyonu.
+\end{itemize}
+
+Bu katkılar tezin önemli bir metodolojik özelliğidir: AI ajanları danışman olarak kullanıldığında, geleneksel bir tez sürecinde mümkün olmayacak hızda \textit{çapraz-disipliner} teşhis yapılabilmektedir. Ajan önerileri her durumda yazar tarafından eleştirel olarak değerlendirilmiş, bazıları (örn. 17 Nisan'daki MLP fc2 split önerisi) sonradan geri alınmıştır; ajanlar otorite değil, danışman rolündedir.
+
+\textbf{Sonuç olarak}, bu bölümün ana mesajı şudur: bir nöral CFD projesinin asıl entelektüel zenginliği, ``hangi modelin ne kadar iyi çalıştığı'' sorusunun cevabında değil; ``hangi modelin hangi durumda \textit{neden} çalışmadığı'' sorusunun cevabındadır. Sekiz bug, sekiz farklı ders verdi; bu derslerin toplamı, INNATE projesinin yalnızca bir model değil, bir \textit{öğrenme süreci} olduğunu kanıtlar.
+
+\medskip
+\noindent\textit{``Bilim, başarısızlıkların düzenli bir biçimde belgelenmesidir; başarı, bu belgelemenin yan ürünüdür.''}

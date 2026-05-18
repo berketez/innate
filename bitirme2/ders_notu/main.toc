@@ -1,0 +1,375 @@
+\babel@toc {turkish}{}\relax 
+\contentsline {chapter}{\numberline {1}Giriş ve Motivasyon}{12}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Mixed Convection Nedir?}{12}{section.1.1}%
+\contentsline {section}{\numberline {1.2}Günlük Hayattan ve Endüstriden Örnekler}{12}{section.1.2}%
+\contentsline {subsection}{\numberline {1.2.1}Bina Havalandırma (HVAC)}{13}{subsection.1.2.1}%
+\contentsline {subsection}{\numberline {1.2.2}Atmosferik Sınır Tabaka}{13}{subsection.1.2.2}%
+\contentsline {subsection}{\numberline {1.2.3}Elektronik Soğutma}{13}{subsection.1.2.3}%
+\contentsline {subsection}{\numberline {1.2.4}Nükleer Reaktör Güvenliği}{13}{subsection.1.2.4}%
+\contentsline {subsection}{\numberline {1.2.5}Metal Döküm ve Kristal Büyütme}{13}{subsection.1.2.5}%
+\contentsline {section}{\numberline {1.3}Araştırma Motivasyonu}{13}{section.1.3}%
+\contentsline {section}{\numberline {1.4}Geleneksel CFD'nin Sınırlamaları}{14}{section.1.4}%
+\contentsline {subsection}{\numberline {1.4.1}Hesaplama Maliyeti}{14}{subsection.1.4.1}%
+\contentsline {subsection}{\numberline {1.4.2}Parametre Taraması Problemi}{14}{subsection.1.4.2}%
+\contentsline {subsection}{\numberline {1.4.3}Genelleştirme Eksikliği}{14}{subsection.1.4.3}%
+\contentsline {section}{\numberline {1.5}Neural Operator Yaklaşımı: Neden?}{14}{section.1.5}%
+\contentsline {section}{\numberline {1.6}Bu Projenin Kapsamı}{15}{section.1.6}%
+\contentsline {section}{\numberline {1.7}Ders Notunun Organizasyonu}{15}{section.1.7}%
+\contentsline {chapter}{\numberline {2}Akışkanlar Dinamiği Temelleri}{17}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Süreklilik Denklemi (Kütle Korunumu)}{17}{section.2.1}%
+\contentsline {subsection}{\numberline {2.1.1}Fiziksel Prensip}{17}{subsection.2.1.1}%
+\contentsline {subsection}{\numberline {2.1.2}Türetme}{17}{subsection.2.1.2}%
+\contentsline {subsection}{\numberline {2.1.3}Sıkıştırılamaz Limit}{18}{subsection.2.1.3}%
+\contentsline {section}{\numberline {2.2}Navier--Stokes Denklemleri (Momentum Korunumu)}{19}{section.2.2}%
+\contentsline {subsection}{\numberline {2.2.1}Fiziksel Prensip}{19}{subsection.2.2.1}%
+\contentsline {subsection}{\numberline {2.2.2}Türetme}{19}{subsection.2.2.2}%
+\contentsline {subsection}{\numberline {2.2.3}Terimlerin Fiziksel Anlamları}{21}{subsection.2.2.3}%
+\contentsline {subsection}{\numberline {2.2.4}Bileşen Formu (Kartezyen)}{21}{subsection.2.2.4}%
+\contentsline {section}{\numberline {2.3}Enerji Denklemi (Isı Taşınımı)}{22}{section.2.3}%
+\contentsline {subsection}{\numberline {2.3.1}Fiziksel Prensip}{22}{subsection.2.3.1}%
+\contentsline {subsection}{\numberline {2.3.2}Türetme}{22}{subsection.2.3.2}%
+\contentsline {section}{\numberline {2.4}Sınır Koşulları}{23}{section.2.4}%
+\contentsline {subsection}{\numberline {2.4.1}No-Slip (Kaymazlık) Koşulu}{23}{subsection.2.4.1}%
+\contentsline {subsection}{\numberline {2.4.2}Periyodik Sınır Koşulları}{23}{subsection.2.4.2}%
+\contentsline {subsection}{\numberline {2.4.3}Sıcaklık Sınır Koşulları (Dirichlet)}{24}{subsection.2.4.3}%
+\contentsline {section}{\numberline {2.5}Limit Durumlar}{24}{section.2.5}%
+\contentsline {subsection}{\numberline {2.5.1}Stokes Akışı ($\mathrm {Re}\to 0$)}{24}{subsection.2.5.1}%
+\contentsline {subsection}{\numberline {2.5.2}Euler Denklemleri ($\nu \to 0$)}{24}{subsection.2.5.2}%
+\contentsline {section}{\numberline {2.6}Denklem Sisteminin Özeti}{24}{section.2.6}%
+\contentsline {chapter}{\numberline {3}Boyutsuz Analiz}{26}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Boyutsuzlaştırma Nedir ve Neden Yapılır?}{26}{section.3.1}%
+\contentsline {section}{\numberline {3.2}Buckingham $\pi $ Teoremi}{26}{section.3.2}%
+\contentsline {section}{\numberline {3.3}Boyutsuzlaştırma Procedürü}{27}{section.3.3}%
+\contentsline {subsection}{\numberline {3.3.1}Adım 1: Referans Büyüklüklerin Seçimi}{27}{subsection.3.3.1}%
+\contentsline {subsection}{\numberline {3.3.2}Adım 2: Boyutsuz Değişkenlerin Tanımı}{27}{subsection.3.3.2}%
+\contentsline {subsection}{\numberline {3.3.3}Adım 3: Türevlerin Dönüştürülmesi}{27}{subsection.3.3.3}%
+\contentsline {subsection}{\numberline {3.3.4}Adım 4: Momentum Denkleminin Boyutsuzlaştırılması}{28}{subsection.3.3.4}%
+\contentsline {subsection}{\numberline {3.3.5}Adım 5: Enerji Denkleminin Boyutsuzlaştırılması}{29}{subsection.3.3.5}%
+\contentsline {subsection}{\numberline {3.3.6}Adım 6: Boyutsuz Süreklilik}{29}{subsection.3.3.6}%
+\contentsline {section}{\numberline {3.4}Boyutsuz Sayılar ve Fiziksel Anlamları}{29}{section.3.4}%
+\contentsline {subsection}{\numberline {3.4.1}Reynolds Sayısı ($\mathrm {Re}$)}{29}{subsection.3.4.1}%
+\contentsline {subsection}{\numberline {3.4.2}Rayleigh Sayısı ($\mathrm {Ra}$)}{30}{subsection.3.4.2}%
+\contentsline {subsection}{\numberline {3.4.3}Prandtl Sayısı ($\mathrm {Pr}$)}{31}{subsection.3.4.3}%
+\contentsline {subsection}{\numberline {3.4.4}Richardson Sayısı ($\mathrm {Ri}$)}{31}{subsection.3.4.4}%
+\contentsline {subsection}{\numberline {3.4.5}Nusselt Sayısı ($\mathrm {Nu}$)}{32}{subsection.3.4.5}%
+\contentsline {section}{\numberline {3.5}Rejim Haritası}{33}{section.3.5}%
+\contentsline {section}{\numberline {3.6}Boyutsuz Denklem Sisteminin Özeti}{34}{section.3.6}%
+\contentsline {chapter}{\numberline {4}Boussinesq Yaklaşımı ve Konveksiyon}{35}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Boussinesq Yaklaşımı Nedir?}{35}{section.4.1}%
+\contentsline {section}{\numberline {4.2}Boussinesq Denklemlerinin Türetmesi}{35}{section.4.2}%
+\contentsline {section}{\numberline {4.3}Rayleigh--B\'{e}nard Konveksiyonu}{37}{section.4.3}%
+\contentsline {subsection}{\numberline {4.3.1}Problem Tanımı}{37}{subsection.4.3.1}%
+\contentsline {subsection}{\numberline {4.3.2}Lineer Stabilite Analizi}{38}{subsection.4.3.2}%
+\contentsline {subsection}{\numberline {4.3.3}Kritik Rayleigh Sayısı}{38}{subsection.4.3.3}%
+\contentsline {subsection}{\numberline {4.3.4}Konveksiyon Yapıları}{38}{subsection.4.3.4}%
+\contentsline {section}{\numberline {4.4}Zorlanmış Konveksiyon}{39}{section.4.4}%
+\contentsline {subsection}{\numberline {4.4.1}Kolmogorov Forcing}{39}{subsection.4.4.1}%
+\contentsline {section}{\numberline {4.5}Mixed Convection}{40}{section.4.5}%
+\contentsline {subsection}{\numberline {4.5.1}Fiziksel Yapılar}{40}{subsection.4.5.1}%
+\contentsline {subsection}{\numberline {4.5.2}Neden Zor?}{41}{subsection.4.5.2}%
+\contentsline {subsection}{\numberline {4.5.3}Literatürdeki Durum}{41}{subsection.4.5.3}%
+\contentsline {section}{\numberline {4.6}Non-Boussinesq Etkileri}{41}{section.4.6}%
+\contentsline {subsection}{\numberline {4.6.1}Boussinesq'in Sınırları}{41}{subsection.4.6.1}%
+\contentsline {subsection}{\numberline {4.6.2}Ne Zaman Gerekir?}{42}{subsection.4.6.2}%
+\contentsline {subsection}{\numberline {4.6.3}Non-Boussinesq Denklemler}{42}{subsection.4.6.3}%
+\contentsline {section}{\numberline {4.7}Bölüm Özeti}{43}{section.4.7}%
+\contentsline {chapter}{\numberline {5}Spectral Yöntemler}{44}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Fourier Serileri}{44}{section.5.1}%
+\contentsline {subsection}{\numberline {5.1.1}Gerçel Form}{44}{subsection.5.1.1}%
+\contentsline {subsection}{\numberline {5.1.2}Kompleks (Exponential) Form}{44}{subsection.5.1.2}%
+\contentsline {section}{\numberline {5.2}Ayrik Fourier Dönüşümü (DFT)}{45}{section.5.2}%
+\contentsline {subsection}{\numberline {5.2.1}Grid Tanimlamasi}{45}{subsection.5.2.1}%
+\contentsline {subsection}{\numberline {5.2.2}DFT Tanimi}{45}{subsection.5.2.2}%
+\contentsline {subsection}{\numberline {5.2.3}Dalga Sayilari ve Nyquist Frekansi}{46}{subsection.5.2.3}%
+\contentsline {section}{\numberline {5.3}FFT Algoritmasi}{46}{section.5.3}%
+\contentsline {subsection}{\numberline {5.3.1}Hesaplama Karmaşıklığı}{46}{subsection.5.3.1}%
+\contentsline {subsection}{\numberline {5.3.2}Cooley-Tukey (1965): Böl ve Yönet}{46}{subsection.5.3.2}%
+\contentsline {subsection}{\numberline {5.3.3}3D FFT}{47}{subsection.5.3.3}%
+\contentsline {section}{\numberline {5.4}Spectral Türev Hesaplama}{47}{section.5.4}%
+\contentsline {subsection}{\numberline {5.4.1}Temel Teorem: Birinci Türev}{48}{subsection.5.4.1}%
+\contentsline {subsection}{\numberline {5.4.2}İkinci Türev}{49}{subsection.5.4.2}%
+\contentsline {subsection}{\numberline {5.4.3}3D'de Gradient ve Laplacian}{49}{subsection.5.4.3}%
+\contentsline {subsection}{\numberline {5.4.4}Sayisal Örnek}{50}{subsection.5.4.4}%
+\contentsline {section}{\numberline {5.5}Anizotropik Domain}{50}{section.5.5}%
+\contentsline {subsection}{\numberline {5.5.1}Bizim Problem Geometrisi}{50}{subsection.5.5.1}%
+\contentsline {subsection}{\numberline {5.5.2}Yöne Bagli Dalga Sayilari}{51}{subsection.5.5.2}%
+\contentsline {subsection}{\numberline {5.5.3}PyTorch Implementasyonu}{51}{subsection.5.5.3}%
+\contentsline {subsubsection}{Nyquist Modu Sifirlama}{51}{section*.6}%
+\contentsline {section}{\numberline {5.6}De-aliasing}{52}{section.5.6}%
+\contentsline {subsection}{\numberline {5.6.1}Problem: Nonlineer Terimlerde Aliasing}{52}{subsection.5.6.1}%
+\contentsline {subsection}{\numberline {5.6.2}2/3 Kurali --- Türetme}{53}{subsection.5.6.2}%
+\contentsline {subsection}{\numberline {5.6.3}3/2 Kurali (Padding Yöntemi)}{53}{subsection.5.6.3}%
+\contentsline {subsection}{\numberline {5.6.4}Kodda De-aliasing}{54}{subsection.5.6.4}%
+\contentsline {section}{\numberline {5.7}Poisson Denklemi Spectral Çözümü}{54}{section.5.7}%
+\contentsline {subsection}{\numberline {5.7.1}Problem}{54}{subsection.5.7.1}%
+\contentsline {subsection}{\numberline {5.7.2}Türetme}{54}{subsection.5.7.2}%
+\contentsline {subsection}{\numberline {5.7.3}$k = 0$ Modu}{55}{subsection.5.7.3}%
+\contentsline {subsection}{\numberline {5.7.4}Pressure Projection (Helmholtz Ayrismasi)}{55}{subsection.5.7.4}%
+\contentsline {section}{\numberline {5.8}Spectral Yöntemlerin Avantaj ve Dezavantajlari}{56}{section.5.8}%
+\contentsline {section}{\numberline {5.9}Bu Bölümün Özeti}{56}{section.5.9}%
+\contentsline {chapter}{\numberline {6}Türbülans ve Large Eddy Simulation}{58}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Türbülans Nedir?}{58}{section.6.1}%
+\contentsline {subsection}{\numberline {6.1.1}Temel Özellikler}{58}{subsection.6.1.1}%
+\contentsline {subsection}{\numberline {6.1.2}Laminar--Türbülant Geçiş}{59}{subsection.6.1.2}%
+\contentsline {section}{\numberline {6.2}Kolmogorov Teorisi (1941)}{59}{section.6.2}%
+\contentsline {subsection}{\numberline {6.2.1}Temel Varsayimlar}{59}{subsection.6.2.1}%
+\contentsline {subsection}{\numberline {6.2.2}Enerji Spektrumu: $-5/3$ Yasasi}{59}{subsection.6.2.2}%
+\contentsline {section}{\numberline {6.3}Enerji Kaskadi}{61}{section.6.3}%
+\contentsline {subsection}{\numberline {6.3.1}Kavramsal Resim}{61}{subsection.6.3.1}%
+\contentsline {section}{\numberline {6.4}Kolmogorov Uzunluk Ölçegi}{61}{section.6.4}%
+\contentsline {subsection}{\numberline {6.4.1}$\eta $ ve $\mathrm {Re}$ İlişkisi}{62}{subsection.6.4.1}%
+\contentsline {section}{\numberline {6.5}DNS (Direct Numerical Simulation)}{62}{section.6.5}%
+\contentsline {subsection}{\numberline {6.5.1}Temel Fikir}{62}{subsection.6.5.1}%
+\contentsline {subsection}{\numberline {6.5.2}Grid Gereksinimleri}{62}{subsection.6.5.2}%
+\contentsline {subsection}{\numberline {6.5.3}Bizim DNS'imiz}{63}{subsection.6.5.3}%
+\contentsline {section}{\numberline {6.6}LES (Large Eddy Simulation)}{63}{section.6.6}%
+\contentsline {subsection}{\numberline {6.6.1}Temel Fikir}{63}{subsection.6.6.1}%
+\contentsline {subsection}{\numberline {6.6.2}Filtreleme}{64}{subsection.6.6.2}%
+\contentsline {subsection}{\numberline {6.6.3}Filtrelenmis Navier-Stokes Denklemleri}{64}{subsection.6.6.3}%
+\contentsline {section}{\numberline {6.7}Smagorinsky Modeli}{64}{section.6.7}%
+\contentsline {subsection}{\numberline {6.7.1}Eddy Viscosity Hipotezi}{64}{subsection.6.7.1}%
+\contentsline {subsection}{\numberline {6.7.2}Smagorinsky Formulasyonu}{65}{subsection.6.7.2}%
+\contentsline {subsection}{\numberline {6.7.3}Efektif Viskozite}{65}{subsection.6.7.3}%
+\contentsline {subsection}{\numberline {6.7.4}Strain Rate Magnitude Hesabi}{65}{subsection.6.7.4}%
+\contentsline {section}{\numberline {6.8}INNATE'te EddyViscosity3D}{66}{section.6.8}%
+\contentsline {subsection}{\numberline {6.8.1}Noron Yapisi}{66}{subsection.6.8.1}%
+\contentsline {subsection}{\numberline {6.8.2}Neden LES Zorunlu?}{66}{subsection.6.8.2}%
+\contentsline {section}{\numberline {6.9}LES Ötesinde: Gelismis SGS Modelleri}{67}{section.6.9}%
+\contentsline {section}{\numberline {6.10}Bu Bölümün Özeti}{67}{section.6.10}%
+\contentsline {chapter}{\numberline {7}Neural Operators ve INNATE Konsepti}{69}{chapter.7}%
+\contentsline {section}{\numberline {7.1}Geleneksel PDE Cozuculeri}{69}{section.7.1}%
+\contentsline {subsection}{\numberline {7.1.1}Mevcut Yontemler}{69}{subsection.7.1.1}%
+\contentsline {subsection}{\numberline {7.1.2}Ortak Sorun: Hesaplama Maliyeti}{69}{subsection.7.1.2}%
+\contentsline {section}{\numberline {7.2}Veri-Gudumlu Yaklasimlar}{70}{section.7.2}%
+\contentsline {subsection}{\numberline {7.2.1}Saf Veri-Gudumlu Modeller}{70}{subsection.7.2.1}%
+\contentsline {section}{\numberline {7.3}PINN (Physics-Informed Neural Networks)}{70}{section.7.3}%
+\contentsline {subsection}{\numberline {7.3.1}Temel Fikir}{70}{subsection.7.3.1}%
+\contentsline {subsection}{\numberline {7.3.2}Calisma Prensibi}{71}{subsection.7.3.2}%
+\contentsline {subsection}{\numberline {7.3.3}Avantaj ve Dezavantajlar}{71}{subsection.7.3.3}%
+\contentsline {section}{\numberline {7.4}FNO (Fourier Neural Operator)}{71}{section.7.4}%
+\contentsline {subsection}{\numberline {7.4.1}Temel Fikir}{71}{subsection.7.4.1}%
+\contentsline {subsection}{\numberline {7.4.2}FNO Katmani}{72}{subsection.7.4.2}%
+\contentsline {subsection}{\numberline {7.4.3}Avantaj ve Dezavantajlar}{72}{subsection.7.4.3}%
+\contentsline {section}{\numberline {7.5}DeepONet}{73}{section.7.5}%
+\contentsline {subsection}{\numberline {7.5.1}Temel Fikir}{73}{subsection.7.5.1}%
+\contentsline {section}{\numberline {7.6}INNATE Konsepti}{73}{section.7.6}%
+\contentsline {subsection}{\numberline {7.6.1}Motivasyon}{73}{subsection.7.6.1}%
+\contentsline {subsection}{\numberline {7.6.2}Temel Fikir}{73}{subsection.7.6.2}%
+\contentsline {subsection}{\numberline {7.6.3}Ag Yapisi = Zaman Adimi}{74}{subsection.7.6.3}%
+\contentsline {subsection}{\numberline {7.6.4}Yorumlanabilirlik}{74}{subsection.7.6.4}%
+\contentsline {section}{\numberline {7.7}INNATE vs Digerleri}{75}{section.7.7}%
+\contentsline {subsection}{\numberline {7.7.1}Kritik Farklar}{75}{subsection.7.7.1}%
+\contentsline {section}{\numberline {7.8}Physics-Only Training}{76}{section.7.8}%
+\contentsline {subsection}{\numberline {7.8.1}Nasil Mumkun?}{76}{subsection.7.8.1}%
+\contentsline {subsection}{\numberline {7.8.2}DNS'in Rolu}{76}{subsection.7.8.2}%
+\contentsline {section}{\numberline {7.9}INNATE'in Mimari Evrimi}{76}{section.7.9}%
+\contentsline {subsection}{\numberline {7.9.1}Ilk Versiyon: PINN-INNATE Hibrit}{76}{subsection.7.9.1}%
+\contentsline {subsection}{\numberline {7.9.2}63 Saatlik Başarısızlık}{77}{subsection.7.9.2}%
+\contentsline {subsection}{\numberline {7.9.3}Yeni Mimari: Saf INNATE}{77}{subsection.7.9.3}%
+\contentsline {section}{\numberline {7.10}Bu Bolumun Ozeti}{78}{section.7.10}%
+\contentsline {chapter}{\numberline {8}Bizim Problemimiz: 3D Mixed Convection}{79}{chapter.8}%
+\contentsline {section}{\numberline {8.1}Problem Tanımı ve Geometri}{79}{section.8.1}%
+\contentsline {subsection}{\numberline {8.1.1}Domain}{79}{subsection.8.1.1}%
+\contentsline {subsection}{\numberline {8.1.2}Sınır Koşulları}{80}{subsection.8.1.2}%
+\contentsline {subsection}{\numberline {8.1.3}Fiziksel Senaryo}{80}{subsection.8.1.3}%
+\contentsline {section}{\numberline {8.2}Kolmogorov Forcing}{80}{section.8.2}%
+\contentsline {subsection}{\numberline {8.2.1}Formülasyon}{80}{subsection.8.2.1}%
+\contentsline {subsection}{\numberline {8.2.2}Neden Kolmogorov Forcing?}{81}{subsection.8.2.2}%
+\contentsline {subsection}{\numberline {8.2.3}Stochastic Mod: Ornstein--Uhlenbeck Süreci}{81}{subsection.8.2.3}%
+\contentsline {section}{\numberline {8.3}Sıcaklık Ayrıştırması}{82}{section.8.3}%
+\contentsline {subsection}{\numberline {8.3.1}Sorun: Periyodik BC ile Sıcaklık Çelişkisi}{82}{subsection.8.3.1}%
+\contentsline {subsection}{\numberline {8.3.2}Çözüm: Baz Profil + Pertürbasyon}{82}{subsection.8.3.2}%
+\contentsline {subsection}{\numberline {8.3.3}Enerji Denklemine Etkisi}{83}{subsection.8.3.3}%
+\contentsline {subsection}{\numberline {8.3.4}Pratikte Uygulama}{83}{subsection.8.3.4}%
+\contentsline {section}{\numberline {8.4}Boyutsuz Denklem Sistemi}{84}{section.8.4}%
+\contentsline {subsection}{\numberline {8.4.1}Momentum Denklemi}{84}{subsection.8.4.1}%
+\contentsline {subsection}{\numberline {8.4.2}Sıcaklık Pertürbasyon Denklemi}{84}{subsection.8.4.2}%
+\contentsline {subsection}{\numberline {8.4.3}Süreklilik Denklemi}{84}{subsection.8.4.3}%
+\contentsline {subsection}{\numberline {8.4.4}Bileşen Formu}{85}{subsection.8.4.4}%
+\contentsline {section}{\numberline {8.5}Boyutsuz Sayılar ve Parametre Uzayı}{85}{section.8.5}%
+\contentsline {subsection}{\numberline {8.5.1}Boyutsuz Sayıların Tanımı}{85}{subsection.8.5.1}%
+\contentsline {subsection}{\numberline {8.5.2}Richardson Sayısı Tablosu}{86}{subsection.8.5.2}%
+\contentsline {subsection}{\numberline {8.5.3}Rejim Analizi}{86}{subsection.8.5.3}%
+\contentsline {section}{\numberline {8.6}CFL Koşulu ve Zaman Adımı}{86}{section.8.6}%
+\contentsline {subsection}{\numberline {8.6.1}CFL Koşulu}{86}{subsection.8.6.1}%
+\contentsline {subsection}{\numberline {8.6.2}Grid Boyutları}{87}{subsection.8.6.2}%
+\contentsline {subsection}{\numberline {8.6.3}Zaman Adımı Analizi}{87}{subsection.8.6.3}%
+\contentsline {section}{\numberline {8.7}Başlangıç Koşulları}{87}{section.8.7}%
+\contentsline {subsection}{\numberline {8.7.1}Hız Alanı}{87}{subsection.8.7.1}%
+\contentsline {subsection}{\numberline {8.7.2}Sıcaklık Alanı}{88}{subsection.8.7.2}%
+\contentsline {subsection}{\numberline {8.7.3}Basınç Alanı}{88}{subsection.8.7.3}%
+\contentsline {subsection}{\numberline {8.7.4}Spin-Up Dönemi}{88}{subsection.8.7.4}%
+\contentsline {section}{\numberline {8.8}Bölüm Özeti}{88}{section.8.8}%
+\contentsline {chapter}{\numberline {9}INNATE Mimarisi}{90}{chapter.9}%
+\contentsline {section}{\numberline {9.1}Temel Prensip: Fizik = Ağ Yapısı}{90}{section.9.1}%
+\contentsline {section}{\numberline {9.2}Nöron Tipleri}{91}{section.9.2}%
+\contentsline {subsection}{\numberline {9.2.1}Advection3D: Nonlineer Konveksiyon}{91}{subsection.9.2.1}%
+\contentsline {subsection}{\numberline {9.2.2}Diffusion: Visköz Yayılma}{91}{subsection.9.2.2}%
+\contentsline {subsection}{\numberline {9.2.3}EddyViscosity3D: LES Nöronu}{92}{subsection.9.2.3}%
+\contentsline {subsection}{\numberline {9.2.4}Projection3D: Süreklilik Zorlaması}{93}{subsection.9.2.4}%
+\contentsline {subsection}{\numberline {9.2.5}Forcing3D: Dış Kuvvet}{93}{subsection.9.2.5}%
+\contentsline {subsection}{\numberline {9.2.6}Buoyancy3D: Kaldırma Kuvveti}{94}{subsection.9.2.6}%
+\contentsline {subsection}{\numberline {9.2.7}ThermalAdvection3D: Sıcaklık Adveksiyonu}{94}{subsection.9.2.7}%
+\contentsline {subsection}{\numberline {9.2.8}ThermalDiffusion3D: Sıcaklık Difüzyonu}{94}{subsection.9.2.8}%
+\contentsline {section}{\numberline {9.3}Parametre Tablosu}{95}{section.9.3}%
+\contentsline {section}{\numberline {9.4}SpectralOps3DAniso: Spektral Operatörler}{95}{section.9.4}%
+\contentsline {subsection}{\numberline {9.4.1}Neden Anizotropik?}{95}{subsection.9.4.1}%
+\contentsline {subsection}{\numberline {9.4.2}Temel Operatörler}{95}{subsection.9.4.2}%
+\contentsline {subsection}{\numberline {9.4.3}Dealiasing: Mode-Index ve Fiziksel $k$}{96}{subsection.9.4.3}%
+\contentsline {section}{\numberline {9.5}Forward Pass Akışı}{96}{section.9.5}%
+\contentsline {subsection}{\numberline {9.5.1}State Yapısı}{96}{subsection.9.5.1}%
+\contentsline {subsection}{\numberline {9.5.2}Bir Zaman Adımının Akışı}{96}{subsection.9.5.2}%
+\contentsline {section}{\numberline {9.6}Yol C: Lokal-Adaptif Parametreler}{98}{section.9.6}%
+\contentsline {subsection}{\numberline {9.6.1}Lokal \"{I}nvariantlar}{98}{subsection.9.6.1}%
+\contentsline {subsection}{\numberline {9.6.2}Adaptif Parametre Formülü}{98}{subsection.9.6.2}%
+\contentsline {subsection}{\numberline {9.6.3}Blok Yapısı}{99}{subsection.9.6.3}%
+\contentsline {subsection}{\numberline {9.6.4}Parametre Bütçesi}{99}{subsection.9.6.4}%
+\contentsline {section}{\numberline {9.7}Bölüm Özeti}{99}{section.9.7}%
+\contentsline {chapter}{\numberline {10}Training Stratejisi}{101}{chapter.10}%
+\contentsline {section}{\numberline {10.1}Physics-Only Training Prensibi}{101}{section.10.1}%
+\contentsline {section}{\numberline {10.2}Loss Fonksiyonları}{101}{section.10.2}%
+\contentsline {subsection}{\numberline {10.2.1}$\mathcal {L}_{\text {divergence}}$: Kütle Korunumu}{102}{subsection.10.2.1}%
+\contentsline {subsection}{\numberline {10.2.2}$\mathcal {L}_{\text {energy}}$: Kinetik Enerji Dengesi}{102}{subsection.10.2.2}%
+\contentsline {subsection}{\numberline {10.2.3}$\mathcal {L}_{\text {spectrum}}$: Enerji Spektrumu}{102}{subsection.10.2.3}%
+\contentsline {subsection}{\numberline {10.2.4}$\mathcal {L}_{\text {dissipation}}$: Dissipasyon Tutarlılığı}{103}{subsection.10.2.4}%
+\contentsline {subsection}{\numberline {10.2.5}$\mathcal {L}_{\text {nusselt}}$: Isı Transferi Kısıtı}{103}{subsection.10.2.5}%
+\contentsline {subsection}{\numberline {10.2.6}$\mathcal {L}_{\text {thermal}}$: Sıcaklık Patlamasi Önleme}{104}{subsection.10.2.6}%
+\contentsline {subsection}{\numberline {10.2.7}$\mathcal {L}_{\text {stability}}$: Enstrophy Patlamasi Önleme}{104}{subsection.10.2.7}%
+\contentsline {section}{\numberline {10.3}Toplam Loss}{104}{section.10.3}%
+\contentsline {section}{\numberline {10.4}Curriculum Learning}{104}{section.10.4}%
+\contentsline {subsection}{\numberline {10.4.1}Faz A: Temel Fizik (Epoch 0--3\,000)}{105}{subsection.10.4.1}%
+\contentsline {subsection}{\numberline {10.4.2}Faz B: Enerji ve Spektrum (Epoch 3\,000--8\,000)}{105}{subsection.10.4.2}%
+\contentsline {subsection}{\numberline {10.4.3}Faz C: Tam Fizik (Epoch 8\,000--15\,000)}{105}{subsection.10.4.3}%
+\contentsline {subsection}{\numberline {10.4.4}Faz D: Non-Boussinesq (Epoch 15\,000--22\,000)}{106}{subsection.10.4.4}%
+\contentsline {section}{\numberline {10.5}Re/Ra Sweep}{106}{section.10.5}%
+\contentsline {subsection}{\numberline {10.5.1}Mekanizma}{106}{subsection.10.5.1}%
+\contentsline {subsection}{\numberline {10.5.2}Neden Randomize?}{106}{subsection.10.5.2}%
+\contentsline {subsection}{\numberline {10.5.3}Tek Model, 9 Rejim}{107}{subsection.10.5.3}%
+\contentsline {section}{\numberline {10.6}Optimizer ve Hiperparametreler}{107}{section.10.6}%
+\contentsline {subsection}{\numberline {10.6.1}AdamW}{107}{subsection.10.6.1}%
+\contentsline {subsection}{\numberline {10.6.2}Learning Rate Şeması}{107}{subsection.10.6.2}%
+\contentsline {subsection}{\numberline {10.6.3}Gradient Clipping}{107}{subsection.10.6.3}%
+\contentsline {subsection}{\numberline {10.6.4}Batch Size ve Unrolling}{108}{subsection.10.6.4}%
+\contentsline {section}{\numberline {10.7}63 Saatlik Başarısız Eğitimden Dersler}{108}{section.10.7}%
+\contentsline {section}{\numberline {10.8}Bölüm Özeti}{108}{section.10.8}%
+\contentsline {chapter}{\numberline {11}DNS Referans ve Validasyon}{110}{chapter.11}%
+\contentsline {section}{\numberline {11.1}Pseudo-Spectral DNS Yöntemi}{110}{section.11.1}%
+\contentsline {subsection}{\numberline {11.1.1}Temel Prensip: Split Evaluation}{110}{subsection.11.1.1}%
+\contentsline {subsection}{\numberline {11.1.2}Bir Zaman Adımının Akışı}{110}{subsection.11.1.2}%
+\contentsline {subsection}{\numberline {11.1.3}DNS Parametreleri}{111}{subsection.11.1.3}%
+\contentsline {section}{\numberline {11.2}DNS Grid Gereksinimleri: Kolmogorov Ölçeği}{111}{section.11.2}%
+\contentsline {subsection}{\numberline {11.2.1}Kolmogorov Ölçeği}{112}{subsection.11.2.1}%
+\contentsline {subsection}{\numberline {11.2.2}DNS Çözünürlük Kriteri}{112}{subsection.11.2.2}%
+\contentsline {subsection}{\numberline {11.2.3}Çözünürlük Tablosu}{112}{subsection.11.2.3}%
+\contentsline {section}{\numberline {11.3}DNS Validasyon Run Planı}{113}{section.11.3}%
+\contentsline {subsection}{\numberline {11.3.1}Neden Bu Parametreler?}{113}{subsection.11.3.1}%
+\contentsline {subsection}{\numberline {11.3.2}Fourier Downsampling: DNS $\to $ INNATE Grid}{113}{subsection.11.3.2}%
+\contentsline {section}{\numberline {11.4}Validasyon Metrikleri ($\mathrm {Re}\leq 3000$, DNS Mevcut)}{114}{section.11.4}%
+\contentsline {subsection}{\numberline {11.4.1}Kinetik Enerji Evrimi}{114}{subsection.11.4.1}%
+\contentsline {subsection}{\numberline {11.4.2}Enstrophy Evrimi}{114}{subsection.11.4.2}%
+\contentsline {subsection}{\numberline {11.4.3}Nusselt Sayısı}{114}{subsection.11.4.3}%
+\contentsline {subsection}{\numberline {11.4.4}Enerji Spektrumu}{114}{subsection.11.4.4}%
+\contentsline {subsection}{\numberline {11.4.5}Alan Düzeyinde Karşılaştırma}{115}{subsection.11.4.5}%
+\contentsline {section}{\numberline {11.5}Fiziksel Tutarlılık Kriterleri ($\mathrm {Re}= 5000$--$10000$, DNS Yok)}{115}{section.11.5}%
+\contentsline {subsection}{\numberline {11.5.1}Sıkıştırılamazlık (Divergence)}{115}{subsection.11.5.1}%
+\contentsline {subsection}{\numberline {11.5.2}Enerji Dengesi}{115}{subsection.11.5.2}%
+\contentsline {subsection}{\numberline {11.5.3}Enerji Spektrum Eğimi}{116}{subsection.11.5.3}%
+\contentsline {subsection}{\numberline {11.5.4}Nusselt Alt Sınırı}{116}{subsection.11.5.4}%
+\contentsline {subsection}{\numberline {11.5.5}Sayısal Stabilite}{116}{subsection.11.5.5}%
+\contentsline {subsection}{\numberline {11.5.6}Sıcaklık Sınırları}{116}{subsection.11.5.6}%
+\contentsline {subsection}{\numberline {11.5.7}Özet: Kriterlerin Sınıflandırılması}{116}{subsection.11.5.7}%
+\contentsline {chapter}{\numberline {12}Beklenen Sonuçlar ve Tartışma}{117}{chapter.12}%
+\contentsline {section}{\numberline {12.1}Farklı Richardson Rejimlerinde Akış Yapıları}{117}{section.12.1}%
+\contentsline {subsection}{\numberline {12.1.1}$\mathrm {Ri}\ll 1$: Zorlanmış Konveksiyon Baskın}{117}{subsection.12.1.1}%
+\contentsline {subsection}{\numberline {12.1.2}$\mathrm {Ri}\sim \mathcal {O}(1)$: Gerçek Mixed Konveksiyon}{117}{subsection.12.1.2}%
+\contentsline {subsection}{\numberline {12.1.3}$\mathrm {Ri}\gg 1$: Kaldırma Kuvveti Baskın}{118}{subsection.12.1.3}%
+\contentsline {subsection}{\numberline {12.1.4}Beklenen Rejim Haritası}{118}{subsection.12.1.4}%
+\contentsline {section}{\numberline {12.2}Nusselt Sayısı Davranışı}{118}{section.12.2}%
+\contentsline {subsection}{\numberline {12.2.1}Doğal Konveksiyon Limiti ($\mathrm {Ri}\gg 1$)}{118}{subsection.12.2.1}%
+\contentsline {subsection}{\numberline {12.2.2}Zorlanmış Konveksiyon Limiti ($\mathrm {Ri}\ll 1$)}{119}{subsection.12.2.2}%
+\contentsline {subsection}{\numberline {12.2.3}Mixed Rejimde Birleşik Etki}{119}{subsection.12.2.3}%
+\contentsline {section}{\numberline {12.3}Enerji Spektrumu}{119}{section.12.3}%
+\contentsline {subsection}{\numberline {12.3.1}Kolmogorov $-5/3$ Yasası}{119}{subsection.12.3.1}%
+\contentsline {subsection}{\numberline {12.3.2}LES Cut-off Etkisi}{119}{subsection.12.3.2}%
+\contentsline {subsection}{\numberline {12.3.3}EddyViscosity3D'nin Spektruma Etkisi}{120}{subsection.12.3.3}%
+\contentsline {subsection}{\numberline {12.3.4}DNS vs INNATE Spektrum Karşılaştırması}{120}{subsection.12.3.4}%
+\contentsline {section}{\numberline {12.4}Boussinesq vs Non-Boussinesq Karşılaştırma}{120}{section.12.4}%
+\contentsline {subsection}{\numberline {12.4.1}Parametre Karşılaştırması}{120}{subsection.12.4.1}%
+\contentsline {subsection}{\numberline {12.4.2}Beklenen Fiziksel Farklar}{120}{subsection.12.4.2}%
+\contentsline {subsection}{\numberline {12.4.3}INNATE'te Non-Boussinesq Nasıl Modelleniyor?}{121}{subsection.12.4.3}%
+\contentsline {section}{\numberline {12.5}Başarı Kriterleri}{121}{section.12.5}%
+\contentsline {subsection}{\numberline {12.5.1}Zorunlu Kriterler (Geç/Kal)}{121}{subsection.12.5.1}%
+\contentsline {subsection}{\numberline {12.5.2}Hedef Kriterler (Başarılı)}{122}{subsection.12.5.2}%
+\contentsline {subsection}{\numberline {12.5.3}İdeal Kriterler (Mükemmel)}{122}{subsection.12.5.3}%
+\contentsline {section}{\numberline {12.6}Potansiyel Katkılar}{122}{section.12.6}%
+\contentsline {chapter}{\numberline {13}Saf-INNATE Spectral Mimari}{124}{chapter.13}%
+\contentsline {section}{\numberline {13.1}Motivasyon: MLP'nin Reddedilmesi}{124}{section.13.1}%
+\contentsline {subsection}{\numberline {13.1.1}Berke'nin Orijinal Vizyonu}{124}{subsection.13.1.1}%
+\contentsline {subsection}{\numberline {13.1.2}v2 Hibrit Mimarinin Sorunu}{125}{subsection.13.1.2}%
+\contentsline {subsection}{\numberline {13.1.3}9 Mayıs 2026 Kararı}{125}{subsection.13.1.3}%
+\contentsline {section}{\numberline {13.2}Klasik Smagorinsky Kapanışının Hatırlatılması}{126}{section.13.2}%
+\contentsline {subsection}{\numberline {13.2.1}Eddy-Viscosity Modeli}{126}{subsection.13.2.1}%
+\contentsline {subsection}{\numberline {13.2.2}Termal Kapanış: Türbülanslı Prandtl Sayısı}{126}{subsection.13.2.2}%
+\contentsline {subsection}{\numberline {13.2.3}Klasik Modelin Kısıtları}{126}{subsection.13.2.3}%
+\contentsline {subsection}{\numberline {13.2.4}Dynamic Smagorinsky Yaklaşımı}{127}{subsection.13.2.4}%
+\contentsline {section}{\numberline {13.3}SpectralCsField Tasarımı}{127}{section.13.3}%
+\contentsline {subsection}{\numberline {13.3.1}Anahtar Fikir: $C_s$'nin Alan Olarak Parametrizasyonu}{127}{subsection.13.3.1}%
+\contentsline {subsection}{\numberline {13.3.2}Modal Sayım ve Parametre Bütçesi}{128}{subsection.13.3.2}%
+\contentsline {subsection}{\numberline {13.3.3}Çıktı Sınırlandırması}{129}{subsection.13.3.3}%
+\contentsline {section}{\numberline {13.4}Fiziksel Yorumlama}{129}{section.13.4}%
+\contentsline {subsection}{\numberline {13.4.1}Düşük-Mod Truncation: Fiziksel Bir Düzenlileştirme}{129}{subsection.13.4.1}%
+\contentsline {subsection}{\numberline {13.4.2}Katman-Bağımsız Profiller: Fractional-Step Heterojenliği}{129}{subsection.13.4.2}%
+\contentsline {subsection}{\numberline {13.4.3}DC Mod ve Baz Skaler}{130}{subsection.13.4.3}%
+\contentsline {subsection}{\numberline {13.4.4}Per-Katman $\mathrm {Pr}_t$: Reynolds Analojisinin Yumuşatılması}{130}{subsection.13.4.4}%
+\contentsline {section}{\numberline {13.5}Forward Pass Akışı}{130}{section.13.5}%
+\contentsline {subsection}{\numberline {13.5.1}Algoritma}{131}{subsection.13.5.1}%
+\contentsline {subsection}{\numberline {13.5.2}Kod Karşılığı}{131}{subsection.13.5.2}%
+\contentsline {subsection}{\numberline {13.5.3}Hesaplama Karmaşıklığı}{132}{subsection.13.5.3}%
+\contentsline {subsection}{\numberline {13.5.4}Bellek Bütçesi}{132}{subsection.13.5.4}%
+\contentsline {section}{\numberline {13.6}Eğitim Davranışı}{133}{section.13.6}%
+\contentsline {subsection}{\numberline {13.6.1}Başlangıç Koşulu}{133}{subsection.13.6.1}%
+\contentsline {subsection}{\numberline {13.6.2}Optimizer ve Loss}{133}{subsection.13.6.2}%
+\contentsline {subsection}{\numberline {13.6.3}Kompleks Tensör Üzerinden Gradyan}{133}{subsection.13.6.3}%
+\contentsline {subsection}{\numberline {13.6.4}Sayısal Güvenlik}{134}{subsection.13.6.4}%
+\contentsline {section}{\numberline {13.7}Avantajlar ve Sınırlar}{134}{section.13.7}%
+\contentsline {subsection}{\numberline {13.7.1}Avantajlar}{134}{subsection.13.7.1}%
+\contentsline {subsection}{\numberline {13.7.2}Sınırlar (Dürüst Değerlendirme)}{135}{subsection.13.7.2}%
+\contentsline {section}{\numberline {13.8}Diğer Saf-INNATE Genişletme Seçenekleri}{135}{section.13.8}%
+\contentsline {subsection}{\numberline {13.8.1}A. Saf-Skaler (200 parametre)}{135}{subsection.13.8.1}%
+\contentsline {subsection}{\numberline {13.8.2}B. Spectral-Cs (9.7K parametre) — \textbf {Seçilen}}{136}{subsection.13.8.2}%
+\contentsline {subsection}{\numberline {13.8.3}C. Genişletilmiş MLP (10K parametre)}{136}{subsection.13.8.3}%
+\contentsline {subsection}{\numberline {13.8.4}D. Hibrit (Spectral $+$ Skaler ölçek MLP, 1.5K)}{136}{subsection.13.8.4}%
+\contentsline {subsection}{\numberline {13.8.5}Karşılaştırma Tablosu}{136}{subsection.13.8.5}%
+\contentsline {section}{\numberline {13.9}Bölüm Özeti}{136}{section.13.9}%
+\contentsline {chapter}{\numberline {A}Analitik Çözümler}{138}{appendix.A}%
+\contentsline {section}{\numberline {A.1}Kolmogorov Akışı (Laminar, 2B)}{138}{section.A.1}%
+\contentsline {subsection}{\numberline {A.1.1}Problem Tanımı}{138}{subsection.A.1.1}%
+\contentsline {subsection}{\numberline {A.1.2}Türetme}{138}{subsection.A.1.2}%
+\contentsline {subsection}{\numberline {A.1.3}Sonuç}{139}{subsection.A.1.3}%
+\contentsline {subsection}{\numberline {A.1.4}İnstabilite Eşiği}{140}{subsection.A.1.4}%
+\contentsline {section}{\numberline {A.2}Rayleigh--B\'{e}nard Lineer Stabilite Analizi}{140}{section.A.2}%
+\contentsline {subsection}{\numberline {A.2.1}Problem Tanımı}{140}{subsection.A.2.1}%
+\contentsline {subsection}{\numberline {A.2.2}Temel Çözüm (Hareketsiz)}{140}{subsection.A.2.2}%
+\contentsline {subsection}{\numberline {A.2.3}Perturbasyonlar}{140}{subsection.A.2.3}%
+\contentsline {subsection}{\numberline {A.2.4}Normal Mod Analizi}{141}{subsection.A.2.4}%
+\contentsline {subsection}{\numberline {A.2.5}Free-Free Sınır Koşulları (Çözülebilir Durum)}{141}{subsection.A.2.5}%
+\contentsline {subsection}{\numberline {A.2.6}Rigid-Rigid Sınır Koşulları}{142}{subsection.A.2.6}%
+\contentsline {subsection}{\numberline {A.2.7}Periyodik Sınır Koşulları (Bizim Durumumuz)}{142}{subsection.A.2.7}%
+\contentsline {section}{\numberline {A.3}1B Isı İletimi}{142}{section.A.3}%
+\contentsline {subsection}{\numberline {A.3.1}Kararlı Hal}{142}{subsection.A.3.1}%
+\contentsline {subsection}{\numberline {A.3.2}Geçici Çözüm}{142}{subsection.A.3.2}%
+\contentsline {section}{\numberline {A.4}Stokes Akışı ($\mathrm {Re}\to 0$ Limiti)}{143}{section.A.4}%
+\contentsline {subsection}{\numberline {A.4.1}Problem}{143}{subsection.A.4.1}%
+\contentsline {subsection}{\numberline {A.4.2}Kolmogorov Forcing ile Çözüm}{143}{subsection.A.4.2}%
+\contentsline {section}{\numberline {A.5}Enerji Dengesi (Analitik)}{144}{section.A.5}%
+\contentsline {subsection}{\numberline {A.5.1}Kinetik Enerji Denkleminin Türetilmesi}{144}{subsection.A.5.1}%
+\contentsline {subsection}{\numberline {A.5.2}Laminer Kolmogorov İçin Analitik Değerler}{144}{subsection.A.5.2}%
+\contentsline {subsection}{\numberline {A.5.3}Türbülant Rejim: Ölçeklenme}{145}{subsection.A.5.3}%
+\contentsline {section}{\numberline {A.6}Özet: Analitik Referans Değerler}{145}{section.A.6}%
+\contentsline {chapter}{\numberline {B}Parametre ve Sembol Tablosu}{146}{appendix.B}%
+\contentsline {section}{\numberline {B.1}Fiziksel Parametreler}{147}{section.B.1}%
+\contentsline {section}{\numberline {B.2}INNATE Nöron Parametreleri}{147}{section.B.2}%
+\contentsline {section}{\numberline {B.3}Boyutsuz Sayılar}{148}{section.B.3}%
+\contentsline {subsection}{\numberline {B.3.1}Tipik Değerler}{149}{subsection.B.3.1}%
+\contentsline {section}{\numberline {B.4}Sembol Listesi}{150}{section.B.4}%
+\contentsline {section}{\numberline {B.5}Kısaltmalar}{151}{section.B.5}%

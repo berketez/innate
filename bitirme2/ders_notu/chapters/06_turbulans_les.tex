@@ -1,0 +1,452 @@
+\chapter{Türbülans ve Large Eddy Simulation}
+\label{ch:turbulans_les}
+
+Türbülans, ak\i{}skanlar dinamiğinin en derin ve çözülmemiş problemidir.
+Bu bölümde türbülansin fizigini, Kolmogorov teorisini, DNS'in sinirlarini ve bu sinirlari aşmak için geliştirilen LES yöntemini inceliyoruz --- çünkü INNATE modelimiz bir LES çözücüsü olarak calisacak.
+
+
+% ============================================================
+\section{Türbülans Nedir?}
+\label{sec:turbulans_nedir}
+
+\subsection{Temel Özellikler}
+
+Türbülans, yüksek Reynolds sayisinda ortaya çikan \textbf{düzensiz, kaotik, çok-ölçekli} ak\i{}s rejimidir. Tanimlayici özellikleri:
+
+\begin{enumerate}
+\item \textbf{Düzensizlik (irregularity):} Hiz, basinc ve sicaklik alanlari hem zamanda hem uzayda düzensiz dalgalanma gösterir. Tek bir realizasyon tahmin edilemez, ama istatistiksel ortalamalar anlamlidir.
+
+\item \textbf{Çok-ölçeklilik (multi-scale):} Enerji taşiyan büyük girdaplardan ($\sim L$, integral ölçek) enerji yok eden en küçük girdaplara ($\sim \eta$, Kolmogorov ölçegi) kadar geniş bir ölçek araliği vardir.
+
+\item \textbf{3B girdap gerilmesi (vortex stretching):} 2B türbülanstan temelden farkli bir mekanizma. Girdap çizgileri gerilir, incelir ve yoğunlaşir:
+\begin{equation}
+\DDt{\vect{\omega}} = (\vect{\omega}\cdot\gradient)\vect{u} + \nu\laplacian\vect{\omega}
+\label{eq:vorticity_eq}
+\end{equation}
+$(\vect{\omega}\cdot\gradient)\vect{u}$ terimi ``girdap gerilmesi''dir --- sadece 3B'de vardir (2B'de $\omega$ skalerdir, bu terim s\i{}fir olur).
+
+\item \textbf{Dissipasyon:} Türbülans sürekli kinetik enerjiyi isiya dönüştürür. Enerji beslemezseniz (forcing), türbülans zamanla söner (Taylor-Green vortex decay problemi tam olarak budur).
+
+\item \textbf{Difuzivite artisi:} Türbülans, momentum ve isi transferini moleküler difuzyondan çok daha etkili yapar. Bu yüzden türbülansl\i{} akislarda Nusselt sayisi yüksektir.
+\end{enumerate}
+
+\subsection{Laminar--Türbülant Geçiş}
+
+Reynolds sayısı arttıkça akış rejimi değişir:
+\begin{itemize}
+\item $\Rey < \Rey_{\text{cr}}$: Laminar akis (düzenli, tahmin edilebilir)
+\item $\Rey \approx \Rey_{\text{cr}}$: Geçis (instabilite, Kelvin-Helmholtz girdaplari)
+\item $\Rey \gg \Rey_{\text{cr}}$: Tam gelismis türbülans
+\end{itemize}
+
+Boru akisi için $\Rey_{\text{cr}} \approx 2300$, düz levha için $\Rey_{\text{cr}} \approx 5\times10^5$.
+Bizim periyodik kutumuzda kritik $\Rey$ geometriye ve forcing'e bağli: $\Rey \approx 1000$'de türbülansi görmeye baslariz.
+
+
+% ============================================================
+\section{Kolmogorov Teorisi (1941)}
+\label{sec:kolmogorov}
+
+Andrey Kolmogorov'un 1941'deki çalişmasi (K41), türbülans teorisinin temel taşidir.
+
+\subsection{Temel Varsayimlar}
+
+\begin{enumerate}
+\item \textbf{Yeterince yüksek $\Rey$'de} (küçük ölçeklerde), türbülans \textbf{istatistiksel olarak izotropik}tir. Büyük ölçeklerdeki anizotropi (mesela forcing yönü) küçük ölçeklere aktarilirken ``unutulur''.
+\item Küçük ölçeklerin istatistikleri \textbf{evrensel}dir: sadece iki parametreye bağlidir:
+\begin{itemize}
+\item $\varepsilon$: enerji dissipasyon hizi $[\text{m}^2/\text{s}^3]$
+\item $\nu$: kinematik viskozite $[\text{m}^2/\text{s}]$
+\end{itemize}
+\end{enumerate}
+
+\subsection{Enerji Spektrumu: $-5/3$ Yasasi}
+\label{subsec:energy_spectrum}
+
+Enerji spektrumu $E(k)$, dalga sayisi $k$'deki birim dalga sayisi basina kinetik enerji yoğunluğudur:
+\begin{equation}
+\frac{1}{2}\langle |\vect{u}|^2 \rangle = \int_0^\infty E(k)\,dk
+\label{eq:total_energy}
+\end{equation}
+
+\textbf{Inertial subrange}'de (enerji üretiminden ve dissipasyondan uzak bölge), $E(k)$ sadece $\varepsilon$ ve $k$'ya bağlıdır:
+\begin{equation}
+E(k) = f(\varepsilon, k) \qquad\text{(fonksiyonel form bilinmiyor, boyut analizi yapalim)}
+\end{equation}
+
+\begin{proof}[Türetme --- Boyut Analizi]
+Birimleri yazalim:
+\begin{align}
+[E(k)] &= \frac{\text{enerji}}{\text{dalga sayisi}} = \frac{\text{m}^2/\text{s}^2}{1/\text{m}} = \text{m}^3/\text{s}^2 \label{eq:dim_Ek} \\
+[\varepsilon] &= \text{m}^2/\text{s}^3 \label{eq:dim_eps} \\
+[k] &= 1/\text{m} \label{eq:dim_k}
+\end{align}
+
+$E(k) = C\,\varepsilon^\alpha\, k^\beta$ formunda yazalim. Birimleri eslestir:
+\begin{equation}
+\text{m}^3\,\text{s}^{-2} = (\text{m}^2\,\text{s}^{-3})^\alpha \cdot (\text{m}^{-1})^\beta
+\end{equation}
+
+Metre üs: $3 = 2\alpha - \beta$. Saniye üs: $-2 = -3\alpha$, dolayisiyla $\alpha = 2/3$.
+
+$\beta = 2\alpha - 3 = 4/3 - 3 = -5/3$. Sonuç:
+
+\begin{equation}
+\boxed{E(k) = C_K\,\varepsilon^{2/3}\,k^{-5/3}}
+\label{eq:kolmogorov_spectrum}
+\end{equation}
+
+$C_K \approx 1.5$ \textbf{Kolmogorov sabiti}dir (deneysel olarak belirlenmistir).
+\end{proof}
+
+Bu iki-üçlü yasasi, türbülans teorisinin en önemli ve en çok dogrulanan sonuçudur. Atmosferden okyanuslara, y\i{}ldiz içlerinden laboratuvar deneylerine kadar geçerlidir.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{energy_spectrum.png}
+\caption{Türbülant enerji spektrumu $E(k)$. Üç bölge: enerji enjeksiyonu (düşük $k$), inertial subrange ($E(k) \sim k^{-5/3}$), ve dissipasyon (yüksek $k$). DNS tüm bölgeleri çözer; LES yalnızca kesme çizigisinin solunu çözer.}
+\label{fig:energy_spectrum}
+\end{figure}
+
+% ============================================================
+\section{Enerji Kaskadi}
+\label{sec:cascade}
+
+\subsection{Kavramsal Resim}
+
+Türbülanstaki enerji ak\i{}s\i{} tek yönlüdür (3B'de):
+
+\begin{equation}
+\underbrace{\text{Enerji üretimi}}_{\text{büyük ölçek } (k \sim k_f)}
+\quad\xrightarrow{\text{kaskad}}\quad
+\underbrace{\text{Inertial transfer}}_{\text{orta ölçekler}}
+\quad\xrightarrow{\text{kaskad}}\quad
+\underbrace{\text{Dissipasyon}}_{\text{küçük ölçek } (k \sim k_\eta)}
+\end{equation}
+
+Detayli olarak üç bölge vardir:
+
+\begin{enumerate}
+\item \textbf{Energy-containing range} ($k \sim k_f$): D\i{}s forcing veya mean shear ile enerji enjekte edilir. Büyük girdaplar burada yasarlar. $E(k)$ davranisi forcing'e bağli (evrensel degil).
+
+\item \textbf{Inertial subrange} ($k_f \ll k \ll k_\eta$): Enerji ne üretilir ne yok edilir, sadece büyük girdaplardan küçüklere \textbf{transfer} edilir. Kolmogorov $-5/3$ yasasi tam burada geçerlidir. Enerji transfer hizi sabittir: $\Pi(k) = \varepsilon$.
+
+\item \textbf{Dissipation range} ($k \gtrsim k_\eta$): Viskoz kuvvetler baskindir. Kinetik enerji isiya donusur:
+\begin{equation}
+\varepsilon = 2\nu\,\mathcal{Z}, \qquad \mathcal{Z} = \frac{1}{2}\langle|\vect{\omega}|^2\rangle \;\text{(enstrofi)}
+\label{eq:dissipation_enstrophy}
+\end{equation}
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{energy_cascade.png}
+\caption{Enerji kaskadı şematik gösterimi. Soldan sağa: enerji üretimi, inertial transfer ($-5/3$ yasası), ve dissipasyon.}
+\label{fig:energy_cascade}
+\end{figure}
+
+
+% ============================================================
+\section{Kolmogorov Uzunluk Ölçegi}
+\label{sec:kolmogorov_scale}
+
+En küçük girdabin boyutu ne kadardir? Dissipasyon bölgesinde iki mekanizma yarışır: inertial transfer ($\varepsilon$) ve visköz difüzyon ($\nu$). Boyut analizi ile:
+
+\begin{equation}
+\eta = \left(\frac{\nu^3}{\varepsilon}\right)^{1/4}
+\label{eq:kolmogorov_eta}
+\end{equation}
+
+\begin{proof}[Türetme]
+$\eta$ bir uzunluktur $[\text{m}]$, ve sadece $\nu\;[\text{m}^2/\text{s}]$ ile $\varepsilon\;[\text{m}^2/\text{s}^3]$'a bağlidir:
+\begin{align}
+[\eta] &= [\nu^\alpha\,\varepsilon^\beta] \notag \\
+\text{m} &= (\text{m}^2\,\text{s}^{-1})^\alpha \cdot (\text{m}^2\,\text{s}^{-3})^\beta
+\end{align}
+Metre: $1 = 2\alpha + 2\beta$. Saniye: $0 = -\alpha - 3\beta$, yani $\alpha = -3\beta$. Birinci denklemde: $1 = -6\beta + 2\beta = -4\beta$, dolayisiyla $\beta = -1/4$, $\alpha = 3/4$.
+\begin{equation}
+\eta = \nu^{3/4}\,\varepsilon^{-1/4} = \left(\frac{\nu^3}{\varepsilon}\right)^{1/4} \quad\checkmark
+\end{equation}
+\end{proof}
+
+\subsection{$\eta$ ve $\Rey$ İlişkisi}
+
+Integral ölçek $L$ ve büyük ölçek hiz $U$ ile $\varepsilon \sim U^3/L$ (boyutsal tahmin). O zaman:
+\begin{equation}
+\frac{\eta}{L} \sim \left(\frac{\nu^3}{U^3/L}\right)^{1/4}\cdot\frac{1}{L} = \left(\frac{\nu}{UL}\right)^{3/4} = \Rey^{-3/4}
+\label{eq:eta_over_L}
+\end{equation}
+
+\begin{equation}
+\boxed{\frac{\eta}{L} \sim \Rey^{-3/4}}
+\end{equation}
+
+$\Rey$ arttıkça en küçük girdap hızla küçülür: ölçek ayrımı genişler.
+
+
+% ============================================================
+\section{DNS (Direct Numerical Simulation)}
+\label{sec:dns}
+
+\subsection{Temel Fikir}
+
+DNS, Navier-Stokes denklemlerini \textbf{hiçbir model kullanmadan} dogrudan çözer. Tüm ölçekler --- $\eta$'dan $L$'ye kadar --- çözünür.
+
+\subsection{Grid Gereksinimleri}
+
+DNS gridinin $\eta$'yi çözümleyecek kadar ince olmasi gerekir: $\Delta x \lesssim \eta$. Bu durumda her yönde gerekli nokta sayisi:
+\begin{equation}
+N \sim \frac{L}{\eta} \sim \Rey^{3/4}
+\end{equation}
+
+3D'de toplam nokta sayisi:
+\begin{equation}
+\boxed{N_{\text{total}} = N^3 \sim \Rey^{9/4}}
+\label{eq:dns_cost}
+\end{equation}
+
+\begin{example}
+Say\i{}sal tahminler:
+\begin{center}
+\begin{tabular}{ccc}
+\toprule
+$\Rey$ & $N_{\text{total}} \sim \Rey^{9/4}$ & Durum \\
+\midrule
+$1{,}000$ & $\sim 5.6\times10^6$ & Masaustu bilgisayar \\
+$3{,}000$ & $\sim 8.8\times10^7$ & İstasyon/kucuk cluster \\
+$10{,}000$ & $\sim 5.6\times10^9$ & Süper bilgisayar \\
+$100{,}000$ & $\sim 10^{12}$ & Dünyanin en buyuk bilgisayarlari \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+$\Rey = 10{,}000$ için: $\eta / L \sim 10{,}000^{-3/4} \approx 10^{-3}$. Eğer $L = 10$ (bizim $L_y$) ise $\eta \approx 0.01$ ve grid $N \approx 1000$. 3D'de $10^9$ nokta. Her zaman adimi için 3D FFT: $\sim 10^{10}$ islem. Binlerce zaman adimi ile çarpilinca --- birkac gün süper bilgisayarda.
+\end{example}
+
+\subsection{Bizim DNS'imiz}
+
+Projede DNS, \textbf{validasyon} için kullanilir (INNATE'in dogru sonuc verip vermedigini kontrol etmek için). DNS'i düsük $\Rey$'de yapariz:
+\begin{itemize}
+\item $\Rey = 1000$: Grid $\approx 192\times320\times128$ (yapılabilir)
+\item $\Rey = 3000$: Grid $\approx 384\times640\times256$ (zorlayici ama mumkun)
+\item $\Rey = 10000$: Grid $\approx 2048\times3200\times1280$ --- $\sim8.4$ milyar nokta, \textbf{imkansiz} (bizim kaynaklarla)
+\end{itemize}
+
+Yüksek $\Rey$'de INNATE, DNS yerine LES yaparak sonuc uretir. DNS sadece referans olarak dusuk $\Rey$'de kullanilir.
+
+
+% ============================================================
+\section{LES (Large Eddy Simulation)}
+\label{sec:les}
+
+\subsection{Temel Fikir}
+
+DNS'in $\Rey^{9/4}$ maliyeti kaldirilamaz. LES'in cozumu:
+\begin{quote}
+Büyük girdaplari \textbf{dogrudan çöz}, küçük girdaplari \textbf{modelle}.
+\end{quote}
+
+Fiziksel gerekce: büyük girdaplar geometriye baglidir ve tahmin edilemez; küçük girdaplar ise (Kolmogorov'a gore) evrensel ve izotropiktir, dolayisiyla basit modellerle iyi temsil edilebilir.
+
+\subsection{Filtreleme}
+
+LES'te hız alanı bir \textbf{uzaysal filtre} ile ayrıştırılır:
+\begin{equation}
+\bar{u}_i(\vect{x},t) = \int G(\vect{x}-\vect{x}',\Delta)\,u_i(\vect{x}',t)\,d\vect{x}'
+\label{eq:les_filter}
+\end{equation}
+
+Burada $G$ filtre fonksiyonu, $\Delta$ filtre genisligi (grid boyutu). Filtreleme:
+\begin{itemize}
+\item \textbf{Cozunen (resolved)} kisim: $\bar{u}_i$ --- büyük girdaplar
+\item \textbf{Cozunmeyen (subgrid-scale, SGS)} kisim: $u'_i = u_i - \bar{u}_i$ --- kucuk girdaplar
+\end{itemize}
+
+\subsection{Filtrelenmis Navier-Stokes Denklemleri}
+
+NS denklemlerini filtreleyelim. Sureklilik denklemi filtreleme ile degismez:
+\begin{equation}
+\pd{\bar{u}_i}{x_i} = 0
+\end{equation}
+
+Momentum denklemi:
+\begin{equation}
+\pd{\bar{u}_i}{t} + \pd{(\bar{u}_i\bar{u}_j)}{x_j} = -\frac{1}{\rho}\pd{\bar{p}}{x_i} + \nu\pdd{\bar{u}_i}{x_j} - \pd{\tau_{ij}^{\text{sgs}}}{x_j}
+\label{eq:les_ns}
+\end{equation}
+
+Burada $\tau_{ij}^{\text{sgs}}$ \textbf{sub-grid scale (SGS) stres tensorudur}:
+\begin{equation}
+\tau_{ij}^{\text{sgs}} = \overline{u_i u_j} - \bar{u}_i\bar{u}_j
+\label{eq:sgs_stress}
+\end{equation}
+
+Bu terim \textbf{bilinmiyor} --- cozunmeyen küçük olceklerin cozunen olceklere etkisini temsil eder. LES'in tum zorluğu bu terimi modellemektir.
+
+\begin{remark}
+SGS stresinin fiziksel anlami: küçük girdaplarin buyuk girdaplara uyguladiği ``sürtünme kuvveti''. Net etki: enerjiyi küçük olceklere transfer etmek (dissipasyon sağlamak).
+\end{remark}
+
+
+% ============================================================
+\section{Smagorinsky Modeli}
+\label{sec:smagorinsky}
+
+En basit ve en yaygin SGS modeli, Smagorinsky (1963) tarafindan atmosfer modellemesi için önerilmiştir.
+
+\subsection{Eddy Viscosity Hipotezi}
+
+SGS stresinin, Boussinesq eddy-viscosity hipotezi ile modellenebileceği varsayilir:
+\begin{equation}
+\tau_{ij}^{\text{sgs}} - \frac{1}{3}\tau_{kk}^{\text{sgs}}\,\delta_{ij} = -2\nu_t\,\bar{S}_{ij}
+\label{eq:eddy_viscosity}
+\end{equation}
+
+Burada $\nu_t$ \textbf{türbülans (eddy) viskozitesidir} --- molekuler viskoziteye ek olarak, küçük girdaplarin etkisini temsil eder. $\bar{S}_{ij}$ filtrelenmis strain rate tensoru:
+\begin{equation}
+\bar{S}_{ij} = \frac{1}{2}\left(\pd{\bar{u}_i}{x_j} + \pd{\bar{u}_j}{x_i}\right)
+\label{eq:strain_rate}
+\end{equation}
+
+\subsection{Smagorinsky Formulasyonu}
+
+$\nu_t$ boyut analizi ile belirlenir:
+\begin{equation}
+[\nu_t] = \text{m}^2/\text{s} = [\text{uzunluk}]^2 \cdot [\text{zaman}]^{-1}
+\end{equation}
+
+Elimizdeki uzunluk olcegi: filtre genisligi $\Delta$. Zaman olcegi: $1/|\bar{S}|$. Dolayisiyla:
+\begin{equation}
+\boxed{\nu_t = (C_s\,\Delta)^2\,|\bar{S}|}
+\label{eq:smagorinsky}
+\end{equation}
+
+Burada:
+\begin{itemize}
+\item $C_s \approx 0.1\text{--}0.2$: \textbf{Smagorinsky sabiti} (boyutsuz)
+\item $\Delta = (\Delta x\cdot\Delta y\cdot\Delta z)^{1/3}$: filtre genisligi (kup kok)
+\item $|\bar{S}| = \sqrt{2\,\bar{S}_{ij}\bar{S}_{ij}}$: strain rate magnitude
+\end{itemize}
+
+\begin{remark}
+$C_s$'nin degeri tartismalidir. Homojen izotropik turbulans icin $C_s \approx 0.17$ (Lilly, 1967'nin teorik tahmini). Kanal akisi icin $C_s \approx 0.1$ daha uygun. INNATE'te $C_s$ \textbf{ogrenilebilir bir parametredir} --- model, probleme ozgu optimal degeri kendi bulur.
+\end{remark}
+
+\subsection{Efektif Viskozite}
+
+LES'te toplam viskoz etki:
+\begin{equation}
+\nu_{\text{eff}} = \nu + \nu_t
+\label{eq:nu_eff}
+\end{equation}
+
+Filtrelenmis momentum denklemi:
+\begin{equation}
+\pd{\bar{u}_i}{t} + (\bar{\vect{u}}\cdot\gradient)\bar{u}_i = -\frac{1}{\rho}\pd{\bar{p}}{x_i} + \nu_{\text{eff}}\laplacian\bar{u}_i
+\label{eq:les_effective}
+\end{equation}
+
+Bu form, DNS denkleminin \emph{aynısı}'dır --- tek fark $\nu$ yerine $\nu_{\text{eff}}$ kullanılması. Çok zarif: LES, DNS kodunun üzerine sadece $\nu_t$ hesabi eklenerek uygulanabilir.
+
+\subsection{Strain Rate Magnitude Hesabi}
+
+$|\bar{S}|$'yi acik olarak yazmak gerekirse (3D'de):
+
+\begin{align}
+\bar{S}_{ij}\bar{S}_{ij} &= \bar{S}_{xx}^2 + \bar{S}_{yy}^2 + \bar{S}_{zz}^2 + 2(\bar{S}_{xy}^2 + \bar{S}_{xz}^2 + \bar{S}_{yz}^2) \label{eq:sij_sij}
+\end{align}
+
+Her bilesen:
+\begin{align}
+\bar{S}_{xx} &= \pd{\bar{u}}{x}, \qquad \bar{S}_{yy} = \pd{\bar{v}}{y}, \qquad \bar{S}_{zz} = \pd{\bar{w}}{z} \\
+\bar{S}_{xy} &= \frac{1}{2}\left(\pd{\bar{u}}{y}+\pd{\bar{v}}{x}\right), \quad
+\bar{S}_{xz} = \frac{1}{2}\left(\pd{\bar{u}}{z}+\pd{\bar{w}}{x}\right), \quad
+\bar{S}_{yz} = \frac{1}{2}\left(\pd{\bar{v}}{z}+\pd{\bar{w}}{y}\right)
+\end{align}
+
+\begin{equation}
+|\bar{S}| = \sqrt{2\,\bar{S}_{ij}\bar{S}_{ij}}
+\label{eq:strain_mag}
+\end{equation}
+
+Tüm bu türevler spectral yöntemle (Bölüm~\ref{ch:spectral}) hesaplanir.
+
+
+% ============================================================
+\section{INNATE'te EddyViscosity3D}
+\label{sec:eddy_viscosity_innate}
+
+Projemizdeki \texttt{EddyViscosity3D} noronu, Smagorinsky modelinin INNATE implementasyonudur.
+
+\subsection{Noron Yapisi}
+
+\begin{equation}
+\nu_t = \big(\underbrace{\tilde{C}_s}_{\text{ogrenilebilir}}\cdot\Delta\big)^2 \cdot |\bar{S}|
+\end{equation}
+
+\textbf{Tek ogrenilebilir parametre:} $\tilde{C}_s$ (başlangıç değeri $0.15$, $[0.05, 0.30]$ arasinda clamp edilir).
+
+\textbf{Grid spacing:}
+\begin{equation}
+\Delta = (\Delta x \cdot \Delta y \cdot \Delta z)^{1/3} = \left(\frac{L_x}{N_x}\cdot\frac{L_y}{N_y}\cdot\frac{L_z}{N_z}\right)^{1/3}
+\end{equation}
+
+Bizim grid icin: $\Delta = (6/96 \cdot 10/160 \cdot 4/64)^{1/3} = (0.0625 \cdot 0.0625 \cdot 0.0625)^{1/3} = 0.0625$.
+
+\subsection{Neden LES Zorunlu?}
+
+63 saatlik basarisiz egitimin \textbf{birincil sebebi} EddyViscosity3D'nin KAPALI olmasiydi. Grid analizi sonuclari bunu dogrular:
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+Grid & $\Rey = 5{,}000$ & $\Rey = 10{,}000$ \\
+\midrule
+$96\times160\times64$ (LES skoru) & 80/100 (iyi) & 74/100 (makul) \\
+$32\times48\times24$ (LES skoru) & 60/100 (zayif) & 44/100 (yetersiz) \\
+DNS gereksinimleri & $\sim10^8$ nokta & $\sim8.4\times10^9$ nokta \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+$96\times160\times64 = 983{,}040$ nokta. $\Rey = 10{,}000$ için DNS $\sim 8.4\times10^9$ nokta gerektirir --- $8{,}500\times$ daha fazla. LES olmadan bu gridde yüksek $\Rey$ çözülemez: subgrid-scale dissipasyon saglanamaz ve enerji birikir $\to$ sayisal patlama (NaN).
+
+
+% ============================================================
+\section{LES Ötesinde: Gelismis SGS Modelleri}
+\label{sec:advanced_sgs}
+
+Smagorinsky modeli basit ve saglamdir ama sinirliliklari vardir:
+
+\begin{itemize}
+\item Duvar yakininda asiri dissipasyon verir ($C_s$'yi küçültmek gerekir).
+\item Laminar--türbülant geçiste türbülans geçiş başlatamaz (``backscatter'' yoktur).
+\item $C_s$ sabittir --- aslinda akisa ve konuma baglidir.
+\end{itemize}
+
+Gelismis modeller:
+\begin{description}
+\item[Dynamic Smagorinsky (Germano, 1991):] $C_s$'yi lokal olarak akinstan hesaplar (test filtre kullanarak). Cok basarili ama hesaplama maliyeti yüksek.
+\item[WALE (Nicoud \& Ducros, 1999):] Duvar yakininda dogru asimptotik davranis. Ek turev hesabi gerektirir.
+\item[Sigma model (Nicoud et al., 2011):] Hiz gradient tensorunun tekil degerleri ile $\nu_t$ hesaplar. Duvar yakininda ve laminar akista dogru sonuc verir.
+\end{description}
+
+\begin{remark}
+INNATE'te $C_s$ zaten ogrenilebilir oldugundan, modelin Dynamic Smagorinsky'nin isini ``ogrenme yoluyla'' yapmasini bekliyoruz. Lokal-adaptif parametreler kullanilirsa (Yol~C mimarisi), $C_s(\vect{x},t)$ uzaysal olarak degisir --- bu, Dynamic Smagorinsky'ye fonksiyonel olarak esittir.
+\end{remark}
+
+
+% ============================================================
+\section{Bu Bölümün Özeti}
+
+\begin{enumerate}
+\item \textbf{Türbülans}: Duzensiz, cok-olcekli, kaotik akis. $\Rey$ arttikca ortaya cikar.
+\item \textbf{Kolmogorov teorisi}: Inertial subrange'de $E(k) = C_K\varepsilon^{2/3}k^{-5/3}$ (evrensel).
+\item \textbf{Kolmogorov olcegi}: $\eta = (\nu^3/\varepsilon)^{1/4}$, $\eta/L \sim \Rey^{-3/4}$.
+\item \textbf{DNS maliyeti}: $N^3 \sim \Rey^{9/4}$ --- yüksek $\Rey$'de imkansiz.
+\item \textbf{LES}: Buyuk girdaplari coz, kucukleri modelle. SGS stresi: $\tau_{ij}^{\text{sgs}} = \overline{u_iu_j} - \bar{u}_i\bar{u}_j$.
+\item \textbf{Smagorinsky}: $\nu_t = (C_s\Delta)^2|\bar{S}|$ --- basit, sağlam, ama sabit $C_s$.
+\item \textbf{INNATE'te LES}: EddyViscosity3D noronu, ogrenilebilir $C_s$ ile Smagorinsky modeli uygular. Grid analizi: $96\times160\times64$ gridde $\Rey = 10{,}000$ için LES zorunlu.
+\end{enumerate}
+
+Bir sonraki bolumde, turbulans tahmini icin gelistirilen neural operator yaklasimlarini --- PINN, FNO, DeepONet ve bizim INNATE konseptimizi --- inceliyoruz.

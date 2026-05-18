@@ -1,0 +1,253 @@
+\chapter{Parametre ve Sembol Tablosu}
+\label{ch:parametreler}
+
+Bu ekte, projede kullanılan tüm fiziksel parametreler, INNATE nöron parametreleri, boyutsuz sayılar ve semboller listelenmektedir.
+
+
+%% ============================================================
+\section{Fiziksel Parametreler}
+\label{sec:fiziksel_param}
+
+\begin{table}[H]
+\centering
+\caption{Simülasyon domain ve fiziksel parametreler.}
+\label{tab:fiziksel_parametreler}
+\begin{tabular}{llll}
+\toprule
+\textbf{Parametre} & \textbf{Sembol} & \textbf{Değer} & \textbf{Açıklama} \\
+\midrule
+\multicolumn{4}{l}{\textit{Domain}} \\
+Boyut ($x$)       & $L_x$ & 6.0   & Boyutsuz, $H$ cinsinden \\
+Boyut ($y$)       & $L_y$ & 10.0  & Dikey yön \\
+Boyut ($z$)       & $L_z$ & 4.0   & Spanwise yön \\
+INNATE grid       & $N_x \times N_y \times N_z$ & $96 \times 160 \times 64$ & LES çözünürlük \\
+DNS grid          & $N_x \times N_y \times N_z$ & $192 \times 320 \times 128$ & Tam çözünürlük \\[6pt]
+\multicolumn{4}{l}{\textit{Zaman}} \\
+$\Delta t$ (INNATE) & $\Delta t$ & 0.005 & Boyutsuz \\
+$\Delta t$ (DNS)    & $\Delta t_{\mathrm{DNS}}$ & 0.001 & CFL $< 0.3$ \\[6pt]
+\multicolumn{4}{l}{\textit{Fizik}} \\
+Reynolds aralığı  & $\Rey$  & $1000$--$10000$ & DNS: $\leq 3000$, INNATE: $\leq 10000$ \\
+Rayleigh aralığı  & $\Ray$  & $10^5$--$10^7$   & \\
+Prandtl            & $\Pran$ & 0.71            & Hava (20\degree C) \\
+Sıcak yüzey       & $T_h$   & 20\degree C     & Alt \\
+Soğuk yüzey       & $T_c$   & 0\degree C      & Üst \\
+$\Delta T$         & $\Delta T$ & 20\,K          & Boussinesq \\
+$\Delta T$         & $\Delta T$ & 50\,K          & Non-Boussinesq \\
+Referans sıcaklık & $T_{\mathrm{ref}}$ & 293.15\,K & $20$\degree C \\[6pt]
+\multicolumn{4}{l}{\textit{Forcing}} \\
+Genlik             & $A$    & 1.0             & Boyutsuz \\
+Dalga sayısı     & $k_f$  & 1               & Temel mod \\
+Mod                & ---    & Kolmogorov      & $F_x = A\sin(k_f \cdot 2\pi y/L_y)$ \\[6pt]
+\multicolumn{4}{l}{\textit{Sınır koşulları}} \\
+Tüm yönler       & ---    & Periyodik       & FFT uyumlu \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+%% ============================================================
+\section{INNATE Nöron Parametreleri}
+\label{sec:noron_param}
+
+Aşağıdaki tabloda her nöron tipinin öğrenilebilir parametresi, başlangıç değeri, izin verilen aralık (clamp) ve fiziksel anlamı verilmiştir.
+
+\begin{table}[H]
+\centering
+\caption{INNATE öğrenilebilir nöron parametreleri.}
+\label{tab:noron_parametreleri}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{p{3.2cm}p{3.2cm}ccp{4.5cm}}
+\toprule
+\textbf{Nöron} & \textbf{Parametre} & \textbf{Init} & \textbf{Clamp} & \textbf{Fiziksel Anlam} \\
+\midrule
+\texttt{Advection3D}
+    & \texttt{advection\_modulator}
+    & 1.0
+    & ---
+    & Adveksiyon şiddeti; 1.0 = nominal \\
+\texttt{Projection3D}
+    & \texttt{pressure\_scale}
+    & 1.0
+    & $[0.5,\, 2.0]$
+    & Poisson çözümünde basınç ölçeği \\
+\texttt{EddyViscosity3D}
+    & \texttt{smagorinsky\_coeff}
+    & 0.15
+    & $[0.05,\, 0.3]$
+    & Smagorinsky $C_s$ katsayısı \\
+\texttt{Forcing3D}
+    & \texttt{amplitude}
+    & 1.0
+    & $[0.01,\, 10.0]$
+    & Forcing genliği $A$ \\
+\texttt{Buoyancy3D}
+    & \texttt{buoyancy\_strength}
+    & 1.0
+    & $[0.0,\, 50.0]$
+    & Kaldırma kuvveti çarpanı \\
+\texttt{ThermalDiffusion3D}
+    & \texttt{kappa\_scale}
+    & 1.0
+    & $[0.1,\, 5.0]$
+    & Termal difüzivite çarpanı \\
+\texttt{ThermalAdvection3D}
+    & ---
+    & ---
+    & ---
+    & Parametresiz (saf operatör) \\
+% NOT: Vorticity3D noronu henuz mimaride tanimlanmamistir (Ch09'da yok).
+% Ileride eklenirse asagidaki satir aktif edilebilir:
+% \texttt{Vorticity3D}
+%     & \texttt{circulation\_preservation}
+%     & 0.99
+%     & ---
+%     & Sirkülasyon koruma oranı \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{remark}
+Her nöron yalnızca 0--1 parametreye sahiptir. Tüm model yüzlerce nörondan oluşsa bile toplam öğrenilebilir parametre sayısı binler mertebesindedir (bir MLP'deki milyonlarla karşılaştırın). Her parametre doğrudan fiziksel anlam taşır --- bu INNATE'in ``yorumlanabilir'' olmasını sağlayan temel tasarım kararıdır.
+\end{remark}
+
+
+%% ============================================================
+\section{Boyutsuz Sayılar}
+\label{sec:boyutsuz_sayilar}
+
+\begin{table}[H]
+\centering
+\caption{Projede kullanılan boyutsuz sayılar.}
+\label{tab:boyutsuz}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{lccp{6cm}}
+\toprule
+\textbf{Sayı} & \textbf{Sembol} & \textbf{Tanım} & \textbf{Fiziksel Anlam} \\
+\midrule
+Reynolds
+    & $\Rey$
+    & $\dfrac{UL}{\nu}$
+    & Atalet / viskoz kuvvet oranı. Yüksek $\Rey$: türbülans. \\
+Rayleigh
+    & $\Ray$
+    & $\dfrac{g\beta\Delta T\, L^3}{\nu \kappa}$
+    & Kaldırma / (viskoz $\times$ termal difüzyon). Yüksek $\Ray$: konveksiyon. \\
+Prandtl
+    & $\Pran$
+    & $\dfrac{\nu}{\kappa}$
+    & Momentum / termal difüzivite. Hava: 0.71, su: 7. \\
+Richardson
+    & $\Rich$
+    & $\dfrac{\Ray}{\Rey^2 \Pran}$
+    & Kaldırma / atalet. $\Rich \ll 1$: forced, $\Rich \gg 1$: natural. \\
+Nusselt
+    & $\Nus$
+    & $1 + \dfrac{\langle v T' \rangle}{\kappa\,\Delta T / L_y}$
+    & Konvektif / iletimsel ısı transferi. $\Nus=1$: saf iletim. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Tipik Değerler}
+
+\begin{table}[H]
+\centering
+\caption{Farklı rejimler için boyutsuz sayı değerleri.}
+\label{tab:tipik_degerler}
+\begin{tabular}{lccccl}
+\toprule
+\textbf{Rejim} & $\Rey$ & $\Ray$ & $\Pran$ & $\Rich$ & \textbf{Yorum} \\
+\midrule
+DNS baseline     & 1000  & $10^5$ & 0.71 & 0.14  & Zorlanmış konveksiyon baskın \\
+DNS mixed        & 2000  & $10^6$ & 0.71 & 0.35  & Gerçek mixed rejim \\
+DNS max Re       & 3000  & $10^5$ & 0.71 & 0.016 & DNS'in sınırı \\
+INNATE sweet spot & 5000 & $10^6$ & 0.71 & 0.056 & LES skoru 80/100 \\
+INNATE max Re    & 10000 & $10^7$ & 0.71 & 0.14  & LES skoru 74/100 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+%% ============================================================
+\section{Sembol Listesi}
+\label{sec:semboller}
+
+\begin{table}[H]
+\centering
+\caption{Semboller (alfabetik sıra).}
+\label{tab:semboller}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{clp{8.5cm}}
+\toprule
+\textbf{Sembol} & \textbf{Ad} & \textbf{Tanım / Birim} \\
+\midrule
+$A$         & Forcing genliği     & Kolmogorov forcing: $F_x = A\sin(\cdots)$. Boyutsuz, varsayılan $=1$. \\
+$C_K$       & Kolmogorov sabiti       & $E(k) = C_K \varepsilon^{2/3} k^{-5/3}$, $\approx 1.5$. \\
+$C_s$       & Smagorinsky katsayısı & $\nu_t = (C_s \Delta)^2 |S|$. Tipik: $0.1$--$0.2$. \\
+$E$         & Kinetik enerji          & $E = \frac{1}{2}\langle |\vect{u}|^2 \rangle$. Hacim ortalaması. \\
+$E(k)$      & Enerji spektrumu        & Dalga sayısı uzayında enerji yoğunluğu. \\
+$H$         & Referans uzunluk        & Boyutsuzlaştırma referansı, $H=1$ (boyutsuz birimde). \\
+$k$         & Dalga sayısı          & $|\vect{k}| = \sqrt{k_x^2 + k_y^2 + k_z^2}$. \\
+$k_f$       & Forcing dalga sayısı  & Kolmogorov forcing'in dalga modu ($=1$). \\
+$k_{\max}$  & Maks.\ dalga sayısı  & $k_{\max} = (2/3)(N/2)(2\pi/L)$, dealiasing sonrası. \\
+$L_f$       & Forcing uzunluk ölçeği & $L_f = L_y/k_f$. \\
+$p$         & Basınç              & Boyutsuz. Poisson denkleminden hesaplanır. \\
+$P$         & Enerji enjeksiyonu       & $P = P_{\text{forcing}} + P_{\text{buoyancy}}$. \\
+$S_{ij}$    & Strain rate tensoru      & $S_{ij} = \frac{1}{2}\left(\frac{\partial u_i}{\partial x_j} + \frac{\partial u_j}{\partial x_i}\right)$. \\
+$|S|$       & Strain rate büyüklüğü & $|S| = \sqrt{2 S_{ij} S_{ij}}$. \\
+$T$         & Sıcaklık (toplam)   & $T = T_{\text{base}}(y) + T'$. \\
+$T'$        & Sıcaklık pertürbasyonu & INNATE'in çözdüğü değişken. Ortalaması sıfır. \\
+$T_{\text{base}}$ & Temel sıcaklık profili & $T_{\text{base}}(y) = T_h - (\Delta T/L_y)\,y$. \\
+$u, v, w$   & Hız bileşenleri     & $x, y, z$ yönlerinde. Boyutsuz. \\
+$U_{\text{rms}}$ & RMS hız            & $U_{\text{rms}} = \sqrt{\langle |\vect{u}|^2 \rangle}$. \\
+\midrule
+$\alpha$    & Spektrum eğimi       & $E(k) \sim k^{-\alpha}$, ideal: $\alpha = 5/3$. \\
+$\beta$     & Termal genleşme kats. & $\rho = \rho_0[1 - \beta(T - T_0)]$. Hava: $\approx 1/T_0$. \\
+$\gamma$    & Özgül ısı oranı & $\gamma = c_p/c_v$. Hava: 1.4. Boussinesq'te kullanılmaz. \\
+$\Delta$    & Filtre genişliği (LES) & $\Delta = (L_x L_y L_z / N_x N_y N_z)^{1/3}$ veya $2\pi/N$. \\
+$\Delta T$  & Sıcaklık farkı     & $T_h - T_c$. \\
+$\varepsilon$ & Dissipasyon hızı   & $\varepsilon = 2\nu Z$ (periyodik BC). \\
+$\eta$      & Kolmogorov uzunluk ölçeği & $\eta = (\nu^3/\varepsilon)^{1/4}$. \\
+$\kappa$    & Termal difüzivite    & $\kappa = \nu/\Pran = 1/(\Rey\Pran)$ (boyutsuz). \\
+$\nu$       & Kinematik viskozite     & $\nu = 1/\Rey$ (boyutsuz). \\
+$\nu_t$     & Eddy viscosity (SGS)    & $\nu_t = (C_s\Delta)^2 |S|$. Smagorinsky modeli. \\
+$\nu_{\text{eff}}$ & Efektif viskozite & $\nu_{\text{eff}} = \nu + \nu_t$. LES toplamı. \\
+$\rho$      & Yoğunluk             & Boussinesq: sabit ($\rho_0$), buoyancy'de lineer. \\
+$\sigma$    & Büyüme hızı (stabilite) & Normal mod analizi: $\sim e^{\sigma t}$. \\
+$\vect{\omega}$ & Vorticity vektörü & $\vect{\omega} = \curl \vect{u}$. \\
+$Z$         & Enstrophy               & $Z = \frac{1}{2}\langle |\vect{\omega}|^2 \rangle$. Küçük ölçek ölçüsü. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+%% ============================================================
+\section{Kısaltmalar}
+\label{sec:kisaltmalar}
+
+\begin{table}[H]
+\centering
+\caption{Metin içinde geçen kısaltmalar.}
+\label{tab:kisaltmalar}
+\begin{tabular}{ll}
+\toprule
+\textbf{Kısaltma} & \textbf{Açıklama} \\
+\midrule
+BC       & Boundary Condition (sınır koşulu) \\
+CFD      & Computational Fluid Dynamics \\
+CFL      & Courant--Friedrichs--Lewy (stabilite koşulu) \\
+DFT/FFT  & Discrete / Fast Fourier Transform \\
+DNS      & Direct Numerical Simulation \\
+FNO      & Fourier Neural Operator \\
+INNATE   & Interpretable Neural Network Architecture for Turbulence Emulation \\
+LES      & Large Eddy Simulation \\
+MLP      & Multi-Layer Perceptron \\
+ODE      & Ordinary Differential Equation \\
+PDE      & Partial Differential Equation \\
+PINN     & Physics-Informed Neural Network \\
+RK4      & 4th-order Runge--Kutta \\
+RMSE     & Root Mean Square Error \\
+SGS      & Sub-Grid Scale \\
+\bottomrule
+\end{tabular}
+\end{table}

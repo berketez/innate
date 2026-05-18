@@ -1,0 +1,168 @@
+\documentclass[12pt,a4paper]{report}
+
+% Türkçe desteği
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[turkish]{babel}
+\AtBeginDocument{\shorthandoff{=}}
+
+% Matematik
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{bm}  % bold math
+
+% Grafikler
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{subcaption}
+\graphicspath{{figures/}}
+
+% Tablolar
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{colortbl}
+
+% Kod gösterimi
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{pagecolor}
+
+% ============================================================
+% DARK MODE
+% ============================================================
+\definecolor{darkbg}{HTML}{000000}       % Saf siyah arka plan (Berke 2026-05-09)
+\definecolor{lighttext}{HTML}{CDD6F4}    % Açık metin
+\definecolor{accentblue}{HTML}{89B4FA}   % Link mavi
+\definecolor{accentgreen}{HTML}{A6E3A1}  % Cite yeşil
+\definecolor{accentpeach}{HTML}{FAB387}  % Vurgu turuncu
+\definecolor{accentred}{HTML}{F38BA8}    % Kırmızı
+\definecolor{accentyellow}{HTML}{F9E2AF} % Sarı
+\definecolor{codebg}{HTML}{313244}       % Kod arka plan
+\definecolor{codefg}{HTML}{CDD6F4}       % Kod metin
+
+\pagecolor{darkbg}
+\color{lighttext}
+
+\lstset{
+  language=Python,
+  basicstyle=\ttfamily\small\color{codefg},
+  keywordstyle=\color{accentblue},
+  commentstyle=\color{accentgreen},
+  stringstyle=\color{accentpeach},
+  numbers=left,
+  numberstyle=\tiny\color{lighttext!50},
+  frame=single,
+  rulecolor=\color{lighttext!30},
+  backgroundcolor=\color{codebg},
+  breaklines=true,
+  captionpos=b
+}
+
+% Sayfa düzeni
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+
+% Bağlantılar
+% Dark mode link renkleri
+\usepackage[colorlinks=true,linkcolor=accentblue,citecolor=accentgreen,urlcolor=accentpeach]{hyperref}
+
+% Dark mode: booktabs çizgi rengi
+\arrayrulecolor{lighttext!40}
+
+% Teorem ortamları
+\theoremstyle{definition}
+\newtheorem{definition}{Tanım}[chapter]
+\newtheorem{theorem}{Teorem}[chapter]
+\newtheorem{example}{Örnek}[chapter]
+\newtheorem{remark}{Not}[chapter]
+
+% Kısa komutlar
+\newcommand{\pd}[2]{\frac{\partial #1}{\partial #2}}
+\newcommand{\pdd}[2]{\frac{\partial^2 #1}{\partial #2^2}}
+\newcommand{\dd}[2]{\frac{d #1}{d #2}}
+\newcommand{\DDt}[1]{\frac{D #1}{Dt}}
+\newcommand{\divergence}{\nabla \cdot}
+\newcommand{\gradient}{\nabla}
+\newcommand{\laplacian}{\nabla^2}
+\newcommand{\curl}{\nabla \times}
+\newcommand{\vect}[1]{\bm{#1}}
+\newcommand{\tensor}[1]{\bm{\mathsf{#1}}}
+\newcommand{\Rey}{\mathrm{Re}}
+\newcommand{\Ray}{\mathrm{Ra}}
+\newcommand{\Pran}{\mathrm{Pr}}
+\newcommand{\Rich}{\mathrm{Ri}}
+\newcommand{\Nus}{\mathrm{Nu}}
+\newcommand{\degree}{\ensuremath{^{\circ}}}
+
+\begin{document}
+
+% ============================================================
+% Kapak
+% ============================================================
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+
+{\Huge\bfseries 3D Mixed Convection\\[0.5cm]
+Neural Operator ile Modelleme}
+
+\vspace{1.5cm}
+
+{\Large\textit{Bitirme Projesi 2 — Kapsamlı Ders Notu}}
+
+\vspace{2cm}
+
+{\large
+\textbf{Berke Tezgöçen}\\[0.3cm]
+Fizik Mühendisliği — İTÜ\\[0.3cm]
+2026
+}
+
+\vspace{2cm}
+
+{\normalsize
+Bu doküman, INNATE (Interpretable Neural Network Architecture\\
+for Turbulence Emulation) kullanarak 3D mixed convection\\
+akışının modellenmesini A'dan Z'ye anlatır.
+}
+
+\vfill
+{\small Hazırlayan: Codex AI Danışman Sistemi \\ Son güncelleme: \today}
+\end{titlepage}
+
+% ============================================================
+\tableofcontents
+\newpage
+
+% ============================================================
+% KISIM I — TEORİK ALTYAPI
+\input{chapters/01_giris}
+\input{chapters/02_akiskanlar_temelleri}
+\input{chapters/03_boyutsuz_analiz}
+\input{chapters/04_boussinesq_konveksiyon}
+\input{chapters/05_spectral_methods}
+\input{chapters/06_turbulans_les}
+\input{chapters/07_neural_operators}
+
+% KISIM II — PROBLEM VE MİMARİ
+\input{chapters/08_bizim_problem}
+\input{chapters/09_innate_mimari}
+\input{chapters/10_training_strateji}
+
+% KISIM III — DENEMELER VE BAŞARISIZLIKLAR (yeni içerik 2026-05-09)
+\input{chapters/11_buglar}
+\input{chapters/12_multi_agent}
+\input{chapters/13_spectral_innate}
+
+% KISIM IV — SONUÇLAR
+\input{chapters/11_dns_validasyon}    % chapter 14 — DNS/LES Referans Validasyon
+\input{chapters/12_beklenen_sonuclar} % chapter 15 — Beklenen ve Elde Edilen Sonuçlar
+
+% ============================================================
+\appendix
+\input{chapters/A_analitik_cozumler}
+\input{chapters/B_parametre_tablosu}
+
+% ============================================================
+\end{document}

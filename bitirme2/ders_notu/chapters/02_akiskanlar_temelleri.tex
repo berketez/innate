@@ -1,0 +1,408 @@
+\chapter{Akışkanlar Dinamiği Temelleri}
+\label{ch:akiskanlar}
+
+Bu bölümde, akışkanlar dinamiğinin temel denklemlerini \textit{sıfırdan} türeteceğiz. Her adımda ``bu terim nereden geldi?'' sorusunu yanıtlayacagız. Türetmeler, korunum yasalarının diferansiyel bir kontrol hacmine uygulanmasıyla elde edilir.
+
+% ============================================================
+\section{Süreklilik Denklemi (Kütle Korunumu)}
+\label{sec:sureklilik}
+
+\subsection{Fiziksel Prensip}
+Kütle ne yaratılır ne yok edilir. Bir kontrol hacmine giren kütle akısı, çıkan kütle akısından farklıysa, hacim içindeki kütle değişir.
+
+\subsection{Türetme}
+
+Uzayda sabit, kenarları $dx$, $dy$, $dz$ olan küçük bir dikdörtgenler prizması (kontrol hacmi) düşünelim. Hacim $dV = dx\,dy\,dz$.
+
+\textbf{Adım 1: Hacim içindeki kütle.}
+\begin{equation}
+    dm = \rho \, dV = \rho \, dx\,dy\,dz
+    \label{eq:dm}
+\end{equation}
+Burada $\rho(\vect{x},t)$ yoğunluk alanıdır.
+
+\textbf{Adım 2: Kütlenin zamana göre değişimi.}
+\begin{equation}
+    \pd{}{t}\bigl(\rho \, dV\bigr) = \pd{\rho}{t}\,dV
+    \label{eq:dm_dt}
+\end{equation}
+Kontrol hacmi sabittir, dolayısıyla $dV$ zamana bağlı değildir.
+
+\textbf{Adım 3: $x$ yönünde kütle akısı.}
+
+$x$ yönünde, sol yüzeyden ($x$ konumunda) giren kütle akısı:
+\begin{equation}
+    \dot{m}_{\text{sol}} = \rho \, u \, dy\,dz \big|_{x}
+\end{equation}
+Sağ yüzeyden ($x+dx$ konumunda) çıkan kütle akısı:
+\begin{equation}
+    \dot{m}_{\text{sag}} = \rho \, u \, dy\,dz \big|_{x+dx}
+    = \left[\rho u + \pd{(\rho u)}{x}\,dx \right] dy\,dz
+\end{equation}
+Burada Taylor açılımı (birinci mertebe) kullandık: $f(x+dx) \approx f(x) + \frac{\partial f}{\partial x}\,dx$.
+
+Net kütle akısı ($x$ yönü, içeri pozitif):
+\begin{equation}
+    \dot{m}_{\text{sol}} - \dot{m}_{\text{sag}} = -\pd{(\rho u)}{x}\,dx\,dy\,dz
+\end{equation}
+
+\textbf{Adım 4: Tüm yönler.}
+
+$y$ ve $z$ yönleri için aynı mantık:
+\begin{equation}
+    \text{Net kütle akısı} = -\left[\pd{(\rho u)}{x} + \pd{(\rho v)}{y} + \pd{(\rho w)}{z}\right] dV
+    = -\divergence(\rho \vect{u}) \, dV
+\end{equation}
+
+\textbf{Adım 5: Kütle korunumu.}
+
+Kütlenin zamana göre değişimi = net giren kütle akısı:
+\begin{equation}
+    \pd{\rho}{t}\,dV = -\divergence(\rho\vect{u})\,dV
+\end{equation}
+
+$dV \neq 0$ olduğundan bölebiliriz:
+\begin{equation}
+    \boxed{\pd{\rho}{t} + \divergence(\rho\vect{u}) = 0}
+    \label{eq:continuity_compressible}
+\end{equation}
+
+Bu, \textbf{sıkıştırılabilir süreklilik denklemi}dir. Her akışkan için geçerlidir.
+
+\subsection{Sıkıştırılamaz Limit}
+
+Yoğunluk sabit ($\rho = \rho_0 = \text{sabit}$) ise:
+\begin{equation}
+    \underbrace{\pd{\rho_0}{t}}_{=0} + \rho_0 \underbrace{\divergence\vect{u}}_{\text{?}} = 0
+\end{equation}
+
+$\rho_0 \neq 0$ olduğundan:
+\begin{equation}
+    \boxed{\divergence\vect{u} = \pd{u}{x} + \pd{v}{y} + \pd{w}{z} = 0}
+    \label{eq:continuity_incompressible}
+\end{equation}
+
+Bu, \textbf{sıkıştırılamaz süreklilik denklemi}dir. Fiziksel anlamı: hız alanının diverjansı sıfırdır; yani akışkan ``ne sıkışır ne genişler.'' Bir noktaya ne kadar akışkan girerse o kadar çıkar.
+
+\begin{remark}
+Sıkıştırılamazlık, yoğunluğun kesinlikle sabit olduğu anlamına gelmez. Boussinesq yaklaşımında yoğunluk sıcaklığa bağlıdır ama $\divergence\vect{u}=0$ hâlâ geçerlidir. Detay için Bölüm~\ref{ch:boussinesq}'e bakınız.
+\end{remark}
+
+
+% ============================================================
+\section{Navier--Stokes Denklemleri (Momentum Korunumu)}
+\label{sec:navier_stokes}
+
+\subsection{Fiziksel Prensip}
+Newton'un ikinci yasası: bir akışkan parçasının momentumunun değişim hızı, üzerine etkiyen kuvvetlerin toplamına eşittir.
+
+\subsection{Türetme}
+
+\textbf{Adım 1: Maddesel (Lagrangian) türev.}
+
+Akışkanla birlikte hareket eden bir parçacığın hızının zamana göre değişimini ifade etmemiz gerekir. Euler (sabit nokta) perspektifinden bakıyorsak, maddesel türev tanımlanmalıdır:
+\begin{equation}
+    \DDt{\vect{u}} = \pd{\vect{u}}{t} + (\vect{u} \cdot \gradient)\vect{u}
+    \label{eq:material_derivative}
+\end{equation}
+
+Bu ifadenin her iki teriminin fiziksel anlamı:
+\begin{itemize}
+    \item $\partial \vect{u}/\partial t$: \textbf{Yerel (lokal) değişim.} Uzayda sabit bir noktada hızın zamanla değişimi. Örneğin: rüzgâr hızının bir istasyonda zamana göre artması.
+    \item $(\vect{u}\cdot\gradient)\vect{u}$: \textbf{Konvektif (advektif) değişim.} Akışkan parçacığının farklı hız bölgelerine taşınmasıyla yaşadığı hız değişimi. Örneğin: bir nehrin daralma bölgesinde hızlanması -- zaman sabit ama konumla hız değişir.
+\end{itemize}
+
+Bileşen formunda ($x$ yönü):
+\begin{equation}
+    \DDt{u} = \pd{u}{t} + u\pd{u}{x} + v\pd{u}{y} + w\pd{u}{z}
+\end{equation}
+
+\textbf{Adım 2: Newton'un ikinci yasası (Cauchy momentum denklemi).}
+
+Bir akışkan elemanı üzerine etkiyen kuvvetler iki türlüdür:
+\begin{itemize}
+    \item \textbf{Yüzey kuvvetleri:} Basınç ve visköz gerilmeler. Bunlar, gerilme tensörü $\tensor{\sigma}$ ile ifade edilir.
+    \item \textbf{Hacim kuvvetleri:} Yerçekimi, manyetik kuvvet, dış zorlama (body forcing). Bunlar, birim hacim başına $\rho\vect{g}$ ve $\vect{F}$ ile ifade edilir.
+\end{itemize}
+
+Newton'un ikinci yasası, birim hacim başına:
+\begin{equation}
+    \rho \DDt{\vect{u}} = \divergence\tensor{\sigma} + \rho\vect{g} + \vect{F}
+    \label{eq:cauchy}
+\end{equation}
+
+Bu, \textbf{Cauchy momentum denklemi}dir. Tüm sürekli ortamlar (sıvı, katı, gaz) için geçerlidir. Henüz malzeme modeline (constitutive relation) bağlı değildir.
+
+\textbf{Adım 3: Gerilme tensörünün ayrıştırılması.}
+
+Gerilme tensörü, basınç ve visköz kısımlara ayrılır:
+\begin{equation}
+    \tensor{\sigma} = -p\,\tensor{I} + \tensor{\tau}
+    \label{eq:stress_decomposition}
+\end{equation}
+
+Burada:
+\begin{itemize}
+    \item $p$: Termodinamik basınç (izotropik, her yöne eşit)
+    \item $\tensor{I}$: Birim tensör ($\delta_{ij}$)
+    \item $\tensor{\tau}$: Visköz (deviatörik) gerilme tensörü
+    \item Eksi işareti: basınç sıkıştırmadır (içe doğru), gerilme konvansiyonu dışa doğru pozitiftir.
+\end{itemize}
+
+\textbf{Adım 4: Newtonian akışkan varsayımı.}
+
+Hava ve su gibi pek çok akışkan, ``Newtonian'' davranış gösterir: gerilme, deformasyon hızıyla doğru orantılıdır. Matematiksel olarak:
+\begin{equation}
+    \tensor{\tau} = \mu\left(\gradient\vect{u} + (\gradient\vect{u})^T\right) - \frac{2}{3}\mu(\divergence\vect{u})\,\tensor{I}
+    \label{eq:newtonian_stress}
+\end{equation}
+
+Burada:
+\begin{itemize}
+    \item $\mu$: Dinamik viskozite [Pa$\cdot$s]. Akışkanın ``iç sürtünmesi.''
+    \item $\gradient\vect{u}$: Hız gradyanı tensörü, bileşenleri $\partial u_i / \partial x_j$.
+    \item $(\gradient\vect{u})^T$: Transpoz. Simetrileştirme gerekir çünkü fiziksel gerilme simetriktir ($\tau_{ij} = \tau_{ji}$).
+    \item $-\frac{2}{3}\mu(\divergence\vect{u})\tensor{I}$: Hacimsel viskozite terimi. Sıkıştırılabilir akışlarda hacim değişiminin yarattığı ek gerilme. Stokes hipotezi ile bulk viskozite ihmal edilmiştir.
+\end{itemize}
+
+\textbf{Adım 5: Cauchy denklemine yerleştirme.}
+
+Denklem~\eqref{eq:stress_decomposition} ve \eqref{eq:newtonian_stress}'i denklem~\eqref{eq:cauchy}'ye yerleştirelim:
+\begin{equation}
+    \rho \DDt{\vect{u}} = -\gradient p + \divergence\left[\mu\left(\gradient\vect{u} + (\gradient\vect{u})^T\right) - \frac{2}{3}\mu(\divergence\vect{u})\tensor{I}\right] + \rho\vect{g} + \vect{F}
+\end{equation}
+
+\textbf{Adım 6: Sıkıştırılamaz basitleştirme.}
+
+Sıkıştırılamaz akışta $\divergence\vect{u} = 0$ olduğundan:
+\begin{itemize}
+    \item $-\frac{2}{3}\mu(\divergence\vect{u})\tensor{I}$ terimi sıfıra gider.
+    \item $\divergence[\mu(\gradient\vect{u})^T] = \mu\,\gradient(\divergence\vect{u}) = 0$ (sabit $\mu$ için).
+\end{itemize}
+
+Kalan:
+\begin{equation}
+    \divergence[\mu\,\gradient\vect{u}] = \mu\,\laplacian\vect{u}
+\end{equation}
+
+Sabit $\mu$ ve $\rho = \rho_0$ ile:
+\begin{equation}
+    \boxed{\pd{\vect{u}}{t} + (\vect{u}\cdot\gradient)\vect{u} = -\frac{1}{\rho_0}\gradient p + \nu\,\laplacian\vect{u} + \vect{g} + \frac{\vect{F}}{\rho_0}}
+    \label{eq:navier_stokes}
+\end{equation}
+
+Burada $\nu = \mu/\rho_0$ \textbf{kinematik viskozite}dir [m$^2$/s].
+
+Bu, \textbf{sıkıştırılamaz Navier--Stokes momentum denklemi}dir.
+
+\subsection{Terimlerin Fiziksel Anlamları}
+
+Denklem~\eqref{eq:navier_stokes}'deki her terimi açıklayalım:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Terim} & \textbf{Matematiksel} & \textbf{Fiziksel Anlam} \\
+\midrule
+Yerel ivme & $\partial\vect{u}/\partial t$ & Hızın zamana göre değişimi \\
+Konvektif ivme & $(\vect{u}\cdot\gradient)\vect{u}$ & Akışkanın kendini taşıması (nonlineer!) \\
+Basınç gradyanı & $-\gradient p/\rho_0$ & Basınç farkının yarattığı kuvvet \\
+Visköz difüzyon & $\nu\laplacian\vect{u}$ & İç sürtünme, momentum yayılımı \\
+Yerçekimi & $\vect{g}$ & Kütlesel çekim kuvveti \\
+Dış zorlama & $\vect{F}/\rho_0$ & Body forcing (rüzgâr vb.) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{remark}
+Konvektif terim $(\vect{u}\cdot\gradient)\vect{u}$ denklemleri \textbf{nonlineer} yapar. Bu nonlineerite, türbülansın kaynağıdır. Lineer denklemler süperpozisyon ilkesine uyar; Navier--Stokes uymaz. Bu yüzden analitik çözüm bulmak genellikle imkânsızdır.
+\end{remark}
+
+\subsection{Bileşen Formu (Kartezyen)}
+
+3B Kartezyen koordinatlarda ($\vect{u} = (u,v,w)$, $\vect{x} = (x,y,z)$):
+
+\textbf{$x$ bileşeni:}
+\begin{equation}
+    \pd{u}{t} + u\pd{u}{x} + v\pd{u}{y} + w\pd{u}{z} = -\frac{1}{\rho_0}\pd{p}{x} + \nu\left(\pdd{u}{x} + \pdd{u}{y} + \pdd{u}{z}\right) + g_x + \frac{F_x}{\rho_0}
+    \label{eq:ns_x}
+\end{equation}
+
+\textbf{$y$ bileşeni:}
+\begin{equation}
+    \pd{v}{t} + u\pd{v}{x} + v\pd{v}{y} + w\pd{v}{z} = -\frac{1}{\rho_0}\pd{p}{y} + \nu\left(\pdd{v}{x} + \pdd{v}{y} + \pdd{v}{z}\right) + g_y + \frac{F_y}{\rho_0}
+    \label{eq:ns_y}
+\end{equation}
+
+\textbf{$z$ bileşeni:}
+\begin{equation}
+    \pd{w}{t} + u\pd{w}{x} + v\pd{w}{y} + w\pd{w}{z} = -\frac{1}{\rho_0}\pd{p}{z} + \nu\left(\pdd{w}{x} + \pdd{w}{y} + \pdd{w}{z}\right) + g_z + \frac{F_z}{\rho_0}
+    \label{eq:ns_z}
+\end{equation}
+
+4 bilinmeyen ($u, v, w, p$) ve 4 denklem (3 momentum + süreklilik). Sistem kapalıdır.
+
+
+% ============================================================
+\section{Enerji Denklemi (Isı Taşınımı)}
+\label{sec:enerji}
+
+\subsection{Fiziksel Prensip}
+Termodinamiğin birinci yasası: bir sistemin iç enerjisinin değişimi, sisteme yapılan ısı transferi ve işin toplamına eşittir.
+
+\subsection{Türetme}
+
+\textbf{Adım 1: Akışkan parçacığının iç enerjisi.}
+
+Birim hacim başına iç enerji $\rho\,e$, burada $e$ kütle başına iç enerjidir. İdeal gaz veya sıkıştırılamaz akışkan için $e = c_v T$ (sabit hacimde özgül ısı$\times$sıcaklık).
+
+\textbf{Adım 2: Isı iletimi (Fourier yasası).}
+
+Isı akısı vektörü:
+\begin{equation}
+    \vect{q} = -k\,\gradient T
+    \label{eq:fourier}
+\end{equation}
+Burada $k$ ısıl iletkenlik [W/(m$\cdot$K)]. Eksi işaret, ısının sıcaktan soğuğa akmasını sağlar.
+
+\textbf{Adım 3: Kontrol hacmi enerji dengesi.}
+
+Maddesel türevle:
+\begin{equation}
+    \rho c_p \DDt{T} = -\divergence\vect{q} + \Phi + Q
+\end{equation}
+
+Burada:
+\begin{itemize}
+    \item $c_p$: Sabit basınçta özgül ısı [J/(kg$\cdot$K)]
+    \item $-\divergence\vect{q}$: Isı iletimi ile gelen net ısı ($= k\,\laplacian T$ sabit $k$ için)
+    \item $\Phi$: Visköz sönüm (ısıya dönüşen mekanik enerji): $\Phi = \tensor{\tau}:\gradient\vect{u}$
+    \item $Q$: Dış ısı kaynağı [W/m$^3$]
+\end{itemize}
+
+\begin{remark}
+$c_p$ ile $c_v$ arasındaki fark, sıkıştırılamaz sıvılarda ihmal edilebilir ($c_p \approx c_v$). Bizim problemimizde Boussinesq hava kullandığımızdan $c_p$ kullanacağız.
+\end{remark}
+
+\textbf{Adım 4: Fourier yasasını yerleştirme.}
+
+Sabit $k$ ve $c_p$ için:
+\begin{equation}
+    \rho_0 c_p \left(\pd{T}{t} + \vect{u}\cdot\gradient T\right) = k\,\laplacian T + \Phi + Q
+\end{equation}
+
+\textbf{Adım 5: Termal difüzivite tanımı ve basitleştirme.}
+
+Termal difüzivite:
+\begin{equation}
+    \kappa \equiv \frac{k}{\rho_0 \, c_p} \quad [\text{m}^2/\text{s}]
+    \label{eq:thermal_diffusivity}
+\end{equation}
+
+Düşük hızlı (düşük Mach) akışlarda visköz sönüm ihmal edilebilir ($\Phi \approx 0$, çünkü $\Phi \sim \mu U^2/L^2$ ve Mach$^2 \ll 1$). Dış kaynak yoksa $Q = 0$:
+\begin{equation}
+    \boxed{\pd{T}{t} + (\vect{u}\cdot\gradient)T = \kappa\,\laplacian T}
+    \label{eq:energy}
+\end{equation}
+
+Bu, \textbf{adveksiyon-difüzyon denklemi}dir. Fiziksel anlamı:
+\begin{itemize}
+    \item Sol taraf: Sıcaklığın maddesel türevi (akışkanla birlikte hareket eden parçacığın sıcaklık değişimi).
+    \item $(\vect{u}\cdot\gradient)T$: Konvektif taşınım. Akışkan sıcaklığı ``taşır.''
+    \item $\kappa\laplacian T$: Termal difüzyon. Isı ``yayılır'' (sıcaktan soğuğa).
+\end{itemize}
+
+Denklem~\eqref{eq:navier_stokes} ile denklem~\eqref{eq:energy}'nin yapısal benzerliğine dikkat edin: her ikisinde de ``yerel değişim + konveksiyon = difüzyon + kaynak'' yapısı vardır. Bu, korunum denklemlerinin evrensel formudur.
+
+
+% ============================================================
+\section{Sınır Koşulları}
+\label{sec:sinir_kosullari}
+
+Diferansiyel denklemler, sınır koşulları olmadan çözülemez. Bu projedeki sınır koşulları:
+
+\subsection{No-Slip (Kaymazlık) Koşulu}
+Katı bir yüzeyde akışkan hızı yüzeyin hızına eşittir. Duran bir duvar için:
+\begin{equation}
+    \vect{u}\big|_{\text{duvar}} = \vect{0}
+    \label{eq:no_slip}
+\end{equation}
+
+Bu, moleküler düzeyde akışkan moleküllerinin duvara yapışmasından kaynaklanır. Deneysel olarak tekrar tekrar doğrulanmıştır.
+
+\subsection{Periyodik Sınır Koşulları}
+Bir yönde alanın periyodik olduğu varsayılır:
+\begin{equation}
+    \vect{u}(0, y, z, t) = \vect{u}(L_x, y, z, t)
+    \label{eq:periodic_bc}
+\end{equation}
+ve aynı şekilde $z$ yönünde. Bizim problemimizde $x$ ve $z$ yönleri periyodiktir.
+
+Periyodik koşullar, sonsuz büyük bir alanın sonlu bir dilimini simüle etmeye olanak tanır. Örneğin: atmosferin küçük bir bölgesini modellerken, kenar etkilerini ortadan kaldırır.
+
+Periyodik koşullar aynı zamanda \textbf{Fourier yöntemleri} için idealdir (çünkü Fourier serileri doğası gereği periyodiktir).
+
+\subsection{Sıcaklık Sınır Koşulları (Dirichlet)}
+Alt ve üst yüzeylerde sabit sıcaklık:
+\begin{equation}
+    T\big|_{y=0} = T_h, \qquad T\big|_{y=H} = T_c
+    \label{eq:temp_bc}
+\end{equation}
+Burada $T_h > T_c$ (alt sıcak, üst soğuk). Bu, klasik Rayleigh--B\'{e}nard konfigurasyonudur.
+
+\begin{remark}
+Sıcaklık alanı için $x$ ve $z$ yönlerinde periyodik koşul kullanılır, ama $y$ yönünde Dirichlet koşulu vardır. Bu asimetri, $y$ yönünde Fourier kullanılaması anlamına gelir; bunun için sıcaklık ayrıştırması $T = T_{\text{base}}(y) + T'$ kullanılır (Bölüm~8'de detay).
+\end{remark}
+
+
+% ============================================================
+\section{Limit Durumlar}
+\label{sec:limitler}
+
+Navier--Stokes denklemlerinin iki önemli limit durumu vardır:
+
+\subsection{Stokes Akışı ($\Rey \to 0$)}
+
+Çok düşük Reynolds sayılarında ($\Rey \ll 1$), visköz kuvvetler atalet kuvvetlerini baskılar. Konvektif terim ihmal edilebilir:
+\begin{equation}
+    \pd{\vect{u}}{t} = -\frac{1}{\rho_0}\gradient p + \nu\,\laplacian\vect{u} + \vect{g}
+    \label{eq:stokes}
+\end{equation}
+
+Bu denklem \textbf{lineerdir} (konvektif nonlineerite yok). Analitik çözüm çoğu zaman mümkündür. Örnekler: bakteri yüzmesi, polimer akışları, mikro-akışkanlar.
+
+\subsection{Euler Denklemleri ($\nu \to 0$)}
+
+Çok yüksek Reynolds sayılarında ($\Rey \to \infty$), visköz terim ihmal edilebilir:
+\begin{equation}
+    \pd{\vect{u}}{t} + (\vect{u}\cdot\gradient)\vect{u} = -\frac{1}{\rho_0}\gradient p + \vect{g}
+    \label{eq:euler}
+\end{equation}
+
+Bu, \textbf{Euler denklemleri}dir. Nonlineerdir ve şok dalgaları, kompresıbl akışlar, atmosferik modeller için kullanılır.
+
+\begin{remark}
+$\nu \to 0$ limiti dikkatli ele alınmalıdır. Viskozite ne kadar küçük olursa olsun, duvar yakınında ince bir sınır tabaka oluşur (Prandtl sınır tabakası teorisi). Bu tabakada visköz etkiler her zaman önemlidir. Euler denklemleri bu tabakayı çözemez.
+\end{remark}
+
+
+% ============================================================
+\section{Denklem Sisteminin Özeti}
+\label{sec:denklem_ozet}
+
+Sıkıştırılamaz, Newtonian akışkan için tam denklem sistemi:
+
+\begin{subequations}
+\label{eq:full_system}
+\begin{align}
+    \pd{\vect{u}}{t} + (\vect{u}\cdot\gradient)\vect{u} &= -\frac{1}{\rho_0}\gradient p + \nu\,\laplacian\vect{u} + \vect{g} + \frac{\vect{F}}{\rho_0} \label{eq:full_momentum} \\
+    \pd{T}{t} + (\vect{u}\cdot\gradient)T &= \kappa\,\laplacian T \label{eq:full_energy} \\
+    \divergence\vect{u} &= 0 \label{eq:full_continuity}
+\end{align}
+\end{subequations}
+
+Bilinmeyenler: $\vect{u}(x,y,z,t) = (u,v,w)$, $p(x,y,z,t)$, $T(x,y,z,t)$ --- toplam 5 skaler alan.
+
+Denklem sayısı: 3 (momentum) + 1 (enerji) + 1 (süreklilik) = 5. Sistem kapalıdır.
+
+Bir sonraki bölümde bu denklemleri boyutsuzlaştırarak, hangi fiziksel etkilerin baskın olduğunu belirleyen boyutsuz sayıları elde edeceğiz.

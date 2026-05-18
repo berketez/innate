@@ -1,0 +1,535 @@
+% ============================================================
+% BÖLÜM 12: ÇOKLU AJAN DEBUG PIPELINE
+% ============================================================
+\chapter{Çoklu Ajan Debug Pipeline}
+\label{ch:multi_agent}
+
+\section{AI-Orchestrated R\&D Yaklaşımı}
+\label{sec:ma_orchestrated}
+
+Bu bölüm, INNATE projesinin yaklaşık üç ay süren geliştirme sürecinde
+benimsenen çalışma tarzını sistematik olarak belgeler. Söz konusu tarz,
+geleneksel ``tek mühendis tek editör başında kod yazar'' modelinden
+belirgin biçimde ayrılır. Berke Tezgöçen'in projedeki rolü, klasik
+anlamda bir kod yazarı olmaktan çok bir \emph{orkestra şefi}'ne benzer:
+hangi enstrümanın (ajanın) ne zaman, hangi nüansla çalacağına karar
+verir; doğrudan tuşlara basan kendisi değildir. Bu yaklaşımı kısaca
+\textbf{AI-orchestrated mühendislik} olarak adlandıracağız.
+
+\subsection{Berke'nin Çalışma Profili}
+
+Berke, projenin başında kendisi için açık bir öz-değerlendirme yapmıştır:
+\emph{``Ben kod yazmıyorum, sistem düşünüyorum.''} Bu cümle bir zayıflık
+itirafı olarak değil, bir mühendislik pozisyonunun açık beyanı olarak
+okunmalıdır. Pratikte bu, şu davranış kalıpları anlamına gelir:
+
+\begin{itemize}
+  \item \textbf{Üst seviye karar verme:} Hangi mimari (PINN, Fourier
+        Neural Operator, fiziksel-modüler INNATE) hangi probleme uyar,
+        hangi Reynolds aralığı eğitimde kullanılır, hangi veri seti
+        bırakılır, hangi metrik birincil hedeftir gibi sorulara
+        Berke karar verir.
+  \item \textbf{Doğrulama ve sorgulama:} Bir ajanın ürettiği çözümü
+        çoğu zaman doğrudan kabul etmez; sayısal sonuçları, terminal
+        çıktısını, log dosyalarını okur, gerekirse ekran fotoğrafı ile
+        ikinci bir ajana gösterir.
+  \item \textbf{Ajan delegasyonu:} Kod yazımı, formül türetme, hata
+        ayıklama, dokümantasyon gibi alt görevler farklı ajanlara
+        dağıtılır. Hangi ajanın hangi görev için uygun olduğunu Berke
+        seçer.
+  \item \textbf{Sistem-seviyesi entegrasyon:} Birden fazla ajanın çelişen
+        önerileri olduğunda nihai birleştirici karar yine Berke'dedir.
+\end{itemize}
+
+Bu profil, çağdaş yazılım/araştırma mühendisliğinde yükselen bir trende
+karşılık gelir: yapay zekâ ajanlarının yalnızca bir ``yazım yardımcısı''
+değil, birer \emph{çoğullaştırılmış araştırmacı} olarak kullanılması.
+Bir kişi, eğer doğru sorular sorabiliyor ve doğru biçimde delege
+edebiliyorsa, klasik anlamda tek başına asla başaramayacağı bir
+çok-uzmanlıklı projeyi yürütebilir.
+
+\subsection{Geleneksel Solo Geliştirme ile Karşılaştırma}
+
+Tablo~\ref{tab:ma_solo_vs_multi}, klasik solo geliştirme ile bu projede
+benimsenen çoklu ajan yaklaşımı arasındaki temel farkları özetler.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{p{4cm} p{5cm} p{5cm}}
+\toprule
+\textbf{Boyut} & \textbf{Solo Geliştirme} & \textbf{Çoklu Ajan Pipeline} \\
+\midrule
+Bilgi kapsamı &
+Geliştiricinin kişisel uzmanlığı ile sınırlı &
+Türbülans, ML, sayısal analiz, sistem mühendisliği gibi farklı
+alanlara paralel erişim \\
+\addlinespace
+Hata ayıklama hızı &
+Hipotez $\rightarrow$ tek deneme $\rightarrow$ döngü &
+Hipotez $\rightarrow$ paralel ikinci/üçüncü görüş $\rightarrow$
+muhalif test $\rightarrow$ deneme \\
+\addlinespace
+Kör nokta riski &
+Yüksek; kişisel önyargılar zor fark edilir &
+Görece düşük; bağımsız ajanlar farklı önyargılar taşır \\
+\addlinespace
+Halüsinasyon riski &
+Düşük (insan kasıtlı yanılmaz) ama insan yorgunluğu yüksek &
+Yapay; ajan halüsine edebilir, doğrulama \emph{şart} \\
+\addlinespace
+Karar yetkisi &
+Kişide &
+Yine kişide; ajanlar danışmandır, karar mercii değil \\
+\addlinespace
+Belge bırakma alışkanlığı &
+Çoğu zaman zayıf (zaman bulunamıyor) &
+Yüksek; her ajan sohbeti zaten metinsel bir kayıttır \\
+\bottomrule
+\end{tabular}
+\caption{Solo geliştirme ile çoklu ajan pipeline karşılaştırması.}
+\label{tab:ma_solo_vs_multi}
+\end{table}
+
+\subsection{Yöntemin Kısıtları}
+
+Bu yaklaşımı bir başarı reçetesi olarak sunmak yanıltıcı olur. Üç ay
+boyunca açıkça gözlemlenen kısıtlar şunlardır:
+
+\begin{enumerate}
+  \item \textbf{Halüsinasyon:} Ajanlar, var olmayan dosyalardan,
+        yanlış API isimlerinden veya yanlış matematiksel
+        özdeşliklerden bahsedebilir. Bu nedenle her teknik iddia, en
+        az bir bağımsız doğrulamadan geçirilmelidir.
+  \item \textbf{Konsensüs paralizi:} Çok sayıda ajan aynı soruya
+        cevap verdiğinde sonuçlar çoğu zaman birbirine yakın çıkar;
+        bu yakınlık ``doğruluk'' ile karıştırılmamalıdır. Aynı veri
+        seti üzerinde eğitilmiş modeller benzer hataları paylaşabilir.
+  \item \textbf{Maliyet ve gecikme:} Yüksek akıl yürütme seviyesinde
+        çağrılar (örn. xhigh) tek başına 7--10 dakika sürebilir;
+        ajanın ajan içinden çağrılması bu süreyi 20+ dakikaya çıkarır.
+        Bu mühendislik gerçekleri sürecin tasarımını biçimlendirir.
+  \item \textbf{Hesap verebilirlik:} Bir hata yapıldığında ``ajan
+        söyledi'' bir mazeret değildir. Nihai sorumluluk, kararı
+        veren insandadır.
+\end{enumerate}
+
+\noindent
+Bu kısıtlar, sonraki bölümlerde tarif edilen pipeline'ın \emph{neden}
+bu biçimde tasarlandığını anlamak için temel arka plandır.
+
+% ============================================================
+\section{Kullanılan Ajan Takımı}
+\label{sec:ma_takim}
+
+INNATE projesinde aktif olarak görev almış ajanlar ve rolleri,
+Tablo~\ref{tab:ma_ajanlar}'da özetlenmiştir. Tablo, her ajanın
+yalnızca model adını değil, projedeki somut katkı örneğini de
+içerir. Bu, soyut bir ``AI ekibi'' tanımı yerine, gerçek mühendislik
+görevlerine bağlanmış bir takım resmi sunar.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{p{2.6cm} p{2.6cm} p{3.4cm} p{4.4cm}}
+\toprule
+\textbf{Ajan} & \textbf{Model} & \textbf{Rol} & \textbf{Örnek katkı} \\
+\midrule
+Claude (ana koordinatör) &
+Anthropic Opus 4.7 (1M ctx) &
+Sistem entegrasyonu, kod yazma, akıl yürütme &
+INNATE v2/v3 model dosyalarının yazımı, training pipeline kurulumu \\
+\addlinespace
+Codex CLI &
+OpenAI GPT-5.5 (xhigh) &
+Matematiksel türetme, ikinci görüş, algoritma doğrulama &
+RK4-IMEX şemasının kararlılık çözümlemesi, von-Neumann sınırları \\
+\addlinespace
+Gemini Pro &
+Google Gemini 3.1 Pro &
+Üçüncü görüş, kod review &
+Spectral loss tasarımının bağımsız değerlendirmesi \\
+\addlinespace
+Cursor IDE Agent &
+Hibrit (uygulama içi) &
+Bağımsız bug-fix, IDE düzeyinde refaktör &
+Phase~C divergence için $\nu_t$ cap önerisi (von-Neumann) \\
+\addlinespace
+CFD Expert &
+Opus alt-ajanı &
+Türbülans, LES, kapama modelleri &
+Buoyancy damping'in katman başına bölünmesi gerektiğinin tespiti \\
+\addlinespace
+ML Expert &
+Opus alt-ajanı &
+PyTorch, optimizer, neural operator &
+20-katmanlı fractional-step LES'in safety çarpımı uyarısı \\
+\addlinespace
+Reviewer &
+Opus alt-ajanı &
+Kod review, kalite kontrol &
+INNATE kütüphanesi 6-bug fix'ten sonra patch doğrulaması \\
+\addlinespace
+Tenth Man &
+Codex GPT-5.5 (xhigh) &
+Zorunlu muhalif (devil's advocate) &
+9 ajan ``MLP fc2 split'' fix'ini onayladığında karşı argümanı \\
+\bottomrule
+\end{tabular}
+\caption{INNATE projesinde aktif olarak kullanılan ajan takımı.}
+\label{tab:ma_ajanlar}
+\end{table}
+
+\subsection{Rollerin Mantığı}
+
+Takım, rastgele bir AI yığını değildir; her ajan belirli bir epistemik
+işlev için seçilmiştir.
+
+\begin{itemize}
+  \item \textbf{Ana koordinatör (Claude):} Uzun bağlam penceresi
+        sayesinde proje tarihçesini, log dosyalarını ve kod tabanını
+        bir arada tutar. Pratikte ``proje belleği'' işlevi görür.
+  \item \textbf{Matematik motoru (Codex):} Türetme yoğun işlerde,
+        özellikle kararlılık analizi, türev çıkarımı ve özel fonksiyon
+        sınırlarında öne çıkar. Ana koordinatörün matematik kısa
+        devrelerine karşı bir ``ikinci göz''dür.
+  \item \textbf{Bağımsız üçüncü göz (Gemini):} Anthropic dışı bir
+        sistem olarak Claude/Codex pipeline'ında ortak olabilecek
+        eğitim verisi önyargılarını taşımaz. Üçüncü görüş kanalı bu
+        nedenle değerlidir.
+  \item \textbf{IDE-içi ajan (Cursor):} Ana pipeline'a bağımlı değildir;
+        Berke'nin paralel olarak çalıştırdığı bir ortamdır. Bu
+        bağımsızlık, çapraz-doğrulama açısından kıymetlidir
+        (Bölüm~\ref{sec:ma_cursor}).
+  \item \textbf{Uzmanlık alt-ajanları (CFD, ML, Reviewer):} Ana
+        koordinatör tarafından çağrılan, dar uzmanlığa odaklı görev
+        kanallarıdır. Pratikte ``konunun adamına sor'' davranışını
+        otomatikleştirirler.
+  \item \textbf{Onuncu Adam (Tenth Man):} Adını, dokuz danışmanın
+        hemfikir olduğunda zorunlu olarak muhalif kalmakla görevli
+        onuncu kişi prensibinden alır. Konsensüsün doğruluk ile
+        karıştırılmasını önler.
+\end{itemize}
+
+% ============================================================
+\section{Multi-Agent Review Pipeline}
+\label{sec:ma_pipeline}
+
+Projedeki tipik bir hata-ayıklama veya tasarım kararı, neredeyse her
+zaman benzer bir dizilim üzerinden ilerlemiştir. Bu dizilim, zaman
+içinde rafine olarak Şekil~\ref{fig:ma_pipeline_text}'teki kavramsal
+akışa oturmuştur.
+
+\begin{figure}[H]
+\centering
+\begin{tabular}{l}
+\textbf{(1)} Berke gözlem yapar (terminal, log, ekran fotoğrafı). \\
+\quad $\downarrow$ \\
+\textbf{(2)} Claude bir tanı/hipotez üretir. \\
+\quad $\downarrow$ \\
+\textbf{(3)} Codex'e ikinci görüş: matematik doğrulama, alternatif hipotez. \\
+\quad $\downarrow$ \\
+\textbf{(4)} Gerekirse Gemini'ye üçüncü görüş gönderilir. \\
+\quad $\downarrow$ \\
+\textbf{(5)} Konsensüs varsa Tenth Man muhalif test'e tabi tutulur. \\
+\quad $\downarrow$ \\
+\textbf{(6)} Berke nihai kararı verir; uygulama Claude tarafından yapılır. \\
+\quad $\downarrow$ \\
+\textbf{(7)} Reviewer ajan, uygulanan değişikliği bağımsız okur ve raporlar. \\
+\end{tabular}
+\caption{Tipik çoklu ajan review pipeline'ı.}
+\label{fig:ma_pipeline_text}
+\end{figure}
+
+Bu akış katı bir protokol değil, bir \emph{varsayılan davranış}tır.
+Basit, düşük etkili değişikliklerde adım~3--5 atlanabilir. Mimari
+düzeyde değişikliklerde ise pipeline'ın sonuna kadar gidilmesi
+beklenir.
+
+\subsection{Vaka Analizi 1 — Yedi BLOCKER Bug Toplu Fix'i (2026-05-01)}
+
+01 Mayıs 2026'da, INNATE training pipeline'ının yeni bir sürümü için
+çoklu ajan code review oturumu düzenlenmiştir. Yöntem şu şekildedir:
+
+\begin{enumerate}
+  \item Aynı kod tabanı, aynı talimatla \emph{paralel} olarak dört
+        ayrı ajana review için verilmiştir: Codex, Gemini, ML Expert
+        ve Reviewer.
+  \item Her ajandan üç kategoride bulgu çıkarması istenmiştir:
+        BLOCKER (yayına engel), MAJOR, MINOR.
+  \item Aynı bulgu en az iki bağımsız ajan tarafından raporlanmışsa
+        BLOCKER olarak kabul edilmiştir.
+  \item Bu eşikleme sonucunda yedi BLOCKER bulgu konsolide edilmiştir.
+\end{enumerate}
+
+\noindent
+Bu yöntemin değeri, ``hangi ajanın haklı olduğunu'' tartışmaktan
+kaçınmasında yatar. Bağımsız ajanların aynı hatayı işaret etmesi,
+hatanın gerçek olma olasılığını çarpıcı biçimde artırır. Ardından
+yedi BLOCKER, tek bir tutarlı yamada toplu olarak düzeltilmiş, sonuç
+yeniden review'a verilmiştir.
+
+\subsection{Vaka Analizi 2 — Phase~C Divergence (2026-05-08)}
+
+Eğitimin Phase~C aşamasında ısıl alan, $\theta_{\mathrm{rms}}$
+metriği üzerinden patlama davranışı sergilemiştir. Akış sırası:
+
+\begin{enumerate}
+  \item \textbf{Gözlem:} $\theta_{\mathrm{rms}}$ Phase~B sonunda
+        $\sim 0.30$~LES, Phase~C başında $\sim 1.17$~LES bandını
+        aşarak patlama eğilimi gösterdi.
+  \item \textbf{Claude'un tanısı:} Forcing UNFREEZE artığı bug;
+        scale-similarity ve $C_s$ MLP'si ısıl döngüye geri besleniyor.
+  \item \textbf{Codex konsültasyonu:} ``Stratejinin yönü doğru,
+        derecesi yetersiz.'' Bu cümle, tek bir cümlede tüm vakanın
+        karakterini özetler.
+  \item \textbf{Önerilen dört dokunuş:}
+        \begin{enumerate}
+          \item Phase~C başlangıcında ``jump'' parametresinin sıfırlanması.
+          \item Optimizer momentum buffer'larının resetlenmesi.
+          \item Spektral kayıp tanımında $\log(\cdot + \varepsilon)$
+                gibi sayısal güvenlik.
+          \item $C_s$ MLP çıktısının fiziksel olarak makul bir aralığa
+                kelepçelenmesi (bounding).
+        \end{enumerate}
+  \item \textbf{Karar:} Berke dört dokunuşu da uygulamayı seçti.
+        Hiçbiri tek başına çözümün tamamı değildi; birleşimleri
+        gradyanı yumuşatıp Phase~C'yi stabilize etti.
+\end{enumerate}
+
+Bu vakanın metodolojik dersi şudur: tek bir ``akıllı'' ajanın tek
+``parlak'' fikrini aramak yerine, birden çok küçük dokunuşun
+birleşimini test etmek çoğu zaman daha sağlam bir mühendislik
+çözümüdür. Çoklu ajan pipeline'ı tam olarak bu birleşimi üretmeyi
+kolaylaştırır.
+
+% ============================================================
+\section{Codex Konsültasyon Felsefesi}
+\label{sec:ma_codex}
+
+Pipeline'ın bel kemiği niteliğindeki bir bileşen, Codex'e gönderilen
+``ikinci görüş'' konsültasyonlarıdır. Bu bölüm, neden böyle bir
+disiplinin benimsendiğini açıklar.
+
+\subsection{Neden Tek Ajan Yetmez?}
+
+Tek bir dil modeline güvenmenin üç sistematik zayıflığı vardır:
+
+\begin{itemize}
+  \item \textbf{Halüsinasyon:} Model, içsel olarak ``emin'' hissetse
+        bile, gerçekte var olmayan bir API, formül veya teorem üretebilir.
+  \item \textbf{Dar görüş alanı:} Bağlam penceresi içine alınan
+        bilgilere göre cevap verir; o pencereye girmeyen kritik bir
+        ayrıntıyı kendiliğinden hatırlamak zorunda değildir.
+  \item \textbf{Aşırı güven (over-confidence):} Akıcı dil, doğruluğun
+        kendisi değildir; aksine, akıcı yanlış cevaplar daha tehlikelidir
+        çünkü insanı ikna eder.
+\end{itemize}
+
+İkinci bir bağımsız sistem (Codex), bu üç zayıflığı birden zayıflatır.
+İkinci ajanın aynı yanlışı paylaşma ihtimali, eğitildiği veri ve
+mimari farklılıkları nedeniyle düşüktür.
+
+\subsection{Çağrı Modları ve Maliyetleri}
+
+Codex çağrıları, akıl yürütme efor seviyesine göre kademelenir:
+\texttt{low}, \texttt{medium}, \texttt{high} ve \texttt{xhigh}.
+İnsancıl bir analoji kurmak gerekirse:
+
+\begin{itemize}
+  \item \texttt{medium}: Bir doktora öğrencisinin günlük içgüdüsel cevabı.
+  \item \texttt{high}: Aynı öğrencinin tahtaya çıkıp türettiği cevabı.
+  \item \texttt{xhigh}: Aynı öğrencinin bir gece düşündükten sonra
+        yazdığı cevabı.
+\end{itemize}
+
+\noindent
+\texttt{xhigh} seviyesi, çağrı başına yaklaşık 7--10 dakika sürebilir;
+buna karşılık matematiksel olarak en az hata yapan moddur. Pratik
+gözlem şöyledir: \texttt{xhigh}, derin algoritma ve kararlılık
+analizinde kullanılmalı; basit LaTeX/prompt üretimi için
+\texttt{medium} fazlasıyla yeter. Bu ekonomi-akıl yürütme dengesi,
+pipeline'ın ne kadar verimli çalışacağını doğrudan belirler.
+
+\subsection{Ajan-içi Codex Çağrısı Tuzağı}
+
+20 Nisan 2026'da yapılan bir deneyde, Codex \texttt{xhigh} bir alt
+ajanın içinden çağrıldığında çağrı 20 dakikadan fazla sürdü ve fiili
+olarak tamamlanmadı. Aynı görev, doğrudan Bash üzerinden Codex'e
+verildiğinde 3--4 dakikada bitti. Bu fiyaskonun dersleri pipeline'ın
+çalışma kurallarına yazıldı:
+
+\begin{itemize}
+  \item Doğrudan kullanım: \texttt{Bash(codex exec ...)}.
+  \item Uzun teknik danışmanlık: özel olarak bu iş için tasarlanmış
+        \texttt{codex-consultant} alt-ajanı.
+  \item Yasaklanan yol: gelişigüzel bir başka ajanın içinden
+        \texttt{codex exec} tetiklemek.
+\end{itemize}
+
+Bu kuralın anlamı, ``araç-içinde-araç'' soyutlamasının kâğıt üzerinde
+zarif görünse de pratikte ek gecikme ve hata kaynağı yarattığıdır.
+
+% ============================================================
+\section{Cursor Ajanının Bağımsız Katkısı}
+\label{sec:ma_cursor}
+
+Berke, pipeline'ı yalnızca Claude/Codex ekseninde işletmemiştir.
+Paralel olarak Cursor IDE içinde de bir ajan çalıştırmıştır. Bu
+ikinci ortam, ana pipeline'a bağımlı olmadığı için ortaya çıkardığı
+çözümler bağımsız çapraz-doğrulama imkânı sağlar.
+
+\subsection{Phase~C Divergence ve $\nu_t$ Cap'i}
+
+Bölüm~\ref{sec:ma_pipeline}'de tarif edilen Phase~C divergence vakası
+sırasında, Cursor ajanı bağımsız bir biçimde aynı problem üzerinde
+çalışmıştır. Önerdiği çözüm, klasik bir lineer kararlılık
+argümanından türetilmiştir.
+
+Eddy viscosity'li bir difüzyon teriminin açık şemada (explicit) Fourier
+modu cinsinden büyütme oranı,
+\begin{equation}
+G(k) \;=\; 1 \;-\; \nu_t \, \Delta t \, k^2,
+\end{equation}
+biçimindedir. Burada $k$ dalgasayısı, $\Delta t$ zaman adımıdır.
+Lineer kararlılık için
+\begin{equation}
+\nu_t \, \Delta t \, k_{\max}^2 \;<\; 2
+\label{eq:ma_vn}
+\end{equation}
+sınırı tipik olarak ``von-Neumann sınırı'' olarak anılır. Cursor
+ajanı, INNATE'in $\nu_t$ alanına bu sınırın bir güvenlik faktörlü
+sürümünü uygulamayı önerdi:
+\begin{equation}
+\nu_t^{\mathrm{cap}}
+\;=\; \frac{\alpha \cdot 2}{\Delta t_{\max} \cdot k_{\max}^2}
+\;\approx\; 0{,}00704,
+\quad \alpha = 0{,}4,
+\end{equation}
+yani teorik sınırın \%40'ı. Bu cap, özellikle düşük $|S|$
+bölgelerinde Cs$\,\Delta$ ve scale-similarity terimlerinin yarattığı
+yerel patlamaları kestiği için kritik olmuştur.
+
+\subsection{Çapraz-Doğrulamanın Değeri}
+
+Claude tarafı bu çözümü değerlendirip şu yargıya varmıştır:
+``Fizik-doğru, mevcut beş yamamızla çakışmıyor, aksine
+komplemanter.'' Bu, çoklu ajan pipeline'ının önemli bir özelliğini
+ortaya koyar:
+
+\begin{itemize}
+  \item Bağımsız ajanlar, aynı problemi farklı kavramsal kapılardan
+        çözebilir.
+  \item Farklı çözümler birbirini dışlamak zorunda değildir; çoğu
+        zaman birbirini tamamlarlar.
+  \item Bu durum, pipeline'ı tek bir ajanın körlüğüne karşı sigortalar.
+\end{itemize}
+
+% ============================================================
+\section{Öğrenilen Dersler}
+\label{sec:ma_dersler}
+
+Üç ay süren çalışma, çoklu ajan pipeline'ı hakkında birkaç sade ders
+bırakmıştır:
+
+\begin{enumerate}
+  \item \textbf{Önce tanı, sonra mimari değişiklik.}
+        Kanıt olmadan refleks olarak yapılan bir mimari değişiklik
+        çoğu zaman iki gün israftır. ``Mimariyi değiştirelim de
+        bakalım'' yaklaşımı, çoklu ajan ortamında özellikle pahalıdır
+        çünkü her ajan o değişikliğe kendi yorumunu eklemek ister.
+  \item \textbf{Bellek ve günlük tutma şarttır.}
+        Üç ayda yapılan onlarca bug fix, eğer kayıt altına alınmamış
+        olsaydı, ajanların ``yeni gelen'' rolüyle her seferinde aynı
+        soruları sormaları gerekecekti. Sürekli bellek
+        (proje kartları, günlük dosyaları, claude-mem arşivi),
+        pipeline'ın işleyişinde bir lüks değil, bir altyapı
+        gerekliliğidir.
+  \item \textbf{Çok ajan her zaman daha iyi değildir.}
+        Üç dört ajanı aşan kalabalıklar, çoğu zaman konsensüs
+        paralizine yol açtı. Bu durumun panzehiri, Onuncu Adam tipi
+        açıkça muhalif bir rolün varlığıdır.
+  \item \textbf{Nihai karar mercii insandır.}
+        ``Üç ajan da onayladı'' bir kararı vermek için yeterli
+        gerekçe değildir; verilen kararın sorumluluğu insandadır.
+        Bu disiplin, ajanların sözünü tartmayı kolaylaştırır.
+  \item \textbf{Halüsinasyon protokolü.}
+        Dosya yolu, fonksiyon adı, proje durumu gibi nesnel
+        gerçekler her zaman dosya sistemi üzerinden doğrulandı.
+        Çelişki çıktığında dosya sistemi, hafıza dosyasından önce
+        gelir; hafıza dosyası, model tahmininden önce gelir; model
+        tahmini, en düşük güven seviyesidir.
+\end{enumerate}
+
+% ============================================================
+\section{AI-Native Engineering — Genel Çerçeve}
+\label{sec:ma_ai_native}
+
+Berke'nin proje boyunca bir cümle ile özetlediği tutum şöyledir:
+\emph{``Programlama yapmıyorum, AI yapıyor; ben yönetiyorum.''} Bu
+samimi öz-ifade, ilk bakışta bir mühendisin ``elini kirletmiyor''
+gibi anlaşılabilir; ancak bu okumanın aksine, çağdaş anlamda ileri
+bir mühendislik tarzıdır. Birkaç gerekçeyi açıkça yazmak gerekir.
+
+\subsection{Bu Bir Zayıflık Değil, Yeni Bir Tarzdır}
+
+Tarihsel olarak mühendisliğin merkezi araçları zaman içinde
+değişmiştir: hesap cetveli, dijital hesap makinesi, derleyici,
+yüksek seviyeli dil, paket yöneticisi, sürüm kontrol sistemi, IDE,
+ve nihayet AI ajanı. Her geçişte, ``artık eskisi kadar elini
+kirletmiyorsun'' eleştirisi yapılmış; ancak her aşamada mühendis
+daha karmaşık problemleri çözebilir hâle gelmiştir.
+
+AI ajanlarını başka bir araç olarak görmek bu çizginin doğal devamıdır.
+Berke'nin profili, bu yeni aracı ciddiye alıp etrafında bir çalışma
+sistematiği kuran bir mühendislik tarzıdır. Bu nedenle bitirme tezi
+çıktısı yalnızca bir model (INNATE) değil, aynı zamanda bir
+\emph{metodoloji}'dir: ``AI-orchestrated CFD research''.
+
+\subsection{Geleceğe Bakış}
+
+Üç gözlem, bu tarzın yakın gelecekte daha da yaygınlaşacağını
+düşündürür:
+
+\begin{itemize}
+  \item Modeller daha güçlü ve daha ucuz hâle geliyor; aynı uzun
+        akıl yürütme bir yıl içinde \texttt{xhigh}'ın bugünkü maliyetinin
+        kesirinde sunulacak.
+  \item Bağlam pencereleri büyüyor; tüm proje tarihinin tek seferde
+        belleğe alınabilmesi, ``proje belleği'' işinin hız ve kaliteyle
+        yapılabilmesini sağlıyor.
+  \item Çoklu ajan orchestration için ortak protokoller
+        olgunlaşıyor; bu sayede bireysel araştırmacılar bile küçük
+        bir ekibin kapsamına ulaşabiliyor.
+\end{itemize}
+
+\subsection{Lisans Tezi Bağlamında Anlamı}
+
+Bu metodoloji, lisans tezi savunmasında üç ayrı düzeyde tartışılabilir:
+
+\begin{enumerate}
+  \item \textbf{Ürün düzeyi:} INNATE mimarisi, parametre cimriliği
+        ve fiziksel yorumlanabilirliği ile bir bilimsel katkı sunar
+        (Bölüm~\ref{ch:multi_agent} dışındaki bölümler).
+  \item \textbf{Süreç düzeyi:} Üç ay süren AI-orkestralı geliştirme
+        süreci kendisi de bir mühendislik katkısıdır; bu katkının
+        belgesi bu bölümdür.
+  \item \textbf{Reflekslerin düzeyi:} Halüsinasyon protokolü,
+        konsensüs paralizine karşı Onuncu Adam disiplini, ajan-içi
+        ajan çağrı tuzağı gibi gözlemler, gelecek araştırmacılara
+        somut tavsiyeler bırakır.
+\end{enumerate}
+
+\noindent
+Sonuç olarak bu bölüm, INNATE'in arkasındaki teknik kararların değil,
+o kararların \emph{nasıl alındığının} kaydıdır. Eğer üç ay sonra
+benzer bir başka projeyi yine bu prensiplerle yürütebiliyorsak,
+pipeline yalnızca bu tezi geçirmiş değil, yeni bir çalışma stilini
+kalıcılaştırmış olur.
+
+\bigskip
+\noindent
+\textit{Önceki bölüm (Bölüm~\ref{ch:buglar}), bu bölümde anlatılan
+pipeline ile fiilen düzeltilen otuza yakın bug ve fix iterasyonunun
+tek tek dökümünü sunar; sonraki bölüm (Bölüm~\ref{ch:spectral})
+ise pipeline'ın ürünü olan nihai mimariyi açıklar.}

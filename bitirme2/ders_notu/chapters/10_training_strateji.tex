@@ -1,0 +1,397 @@
+% ============================================================
+% Bölüm 10: Training Stratejisi
+% ============================================================
+
+\chapter{Training Stratejisi}
+\label{ch:training}
+
+INNATE'in $\sim$5--10K parametresi, DNS verisi kullanmadan --- yalnızca fizik tabanlı loss fonksiyonlarıyla eğitilir. Bu yaklaşım, ``physics-only training'' olarak adlandırılır. Bu bölüm, loss fonksiyonlarının fiziksel türetmesini, curriculum learning stratejisini, Re/Ra sweep mekanizmasını ve optimizer seçimlerini kapsar.
+
+
+% ============================================================
+\section{Physics-Only Training Prensibi}
+\label{sec:physics_only}
+
+Geleneksel neural operator eğitiminde:
+\begin{equation}
+    \mathcal{L}_{\text{data}} = \|\vect{u}_{\text{model}} - \vect{u}_{\text{DNS}}\|^2
+    \label{eq:data_loss}
+\end{equation}
+Model çıktısı, yüksek çözünürlüklü DNS referansına yaklaştırılır.
+
+INNATE'te bu yaklaşım kullanılmaz. Nedenleri:
+\begin{enumerate}
+    \item \textbf{DNS yapılamazlığı:} $\Rey = 10{,}000$'de 3B DNS, $N \sim \Rey^{9/4} \approx 8.4 \times 10^9$ grid noktası gerektirir; bu mevcut donanımla pratik değildir.
+    \item \textbf{Yapısal çözücü avantajı:} INNATE'in forward pass'ı zaten NS denklemlerini \textit{yapısal olarak} çözer (Advection, Diffusion, Projection, \ldots). Eğitilen şey denklemlerin kendisi değil, yalnızca birkaç bin fiziksel parametredir.
+    \item \textbf{Genelleştirme:} Tek bir $(\Rey, \Ray)$ çiftine göre eğitmek yerine, parametre uzayında sweep yaparak tek bir modelin geniş aralıkta çalışması sağlanır.
+\end{enumerate}
+
+\textbf{Eğitim felsefesi:} DNS verisi eğitimde kullanılmaz; yalnızca \textit{validasyon} için saklanır. Model, fiziksel tutarlılık loss'larıyla kalibre edilir.
+
+
+% ============================================================
+\section{Loss Fonksiyonları}
+\label{sec:loss_functions}
+
+Yedi loss fonksiyonu, NS denklemlerinin farklı fiziksel kısıtlarını zorlar.
+
+
+% --- L1: Divergence ---
+\subsection{$\mathcal{L}_{\text{divergence}}$: Kütle Korunumu}
+\label{sec:loss_divergence}
+
+\begin{equation}
+    \boxed{
+        \mathcal{L}_{\text{div}} = \left\|\divergence \vect{u}\right\|_2^2
+        + 0.1 \, \left\|\divergence \vect{u}\right\|_1
+    }
+    \label{eq:loss_div}
+\end{equation}
+
+\textbf{Türetme:} Sıkıştırılamaz akışta kütle korunumu $\divergence \vect{u} = 0$'ı gerektirir. Projection nöronu bunu her adımda zorlar, ancak RK4 integrasyon sırasında ara aşamalarda küçük sapmalar oluşabilir. Unrolled time-stepping'de bu sapmalar birikebilir.
+
+$L_2$ normu genel sapmayı c\ ezalandırırken, $L_1$ terimi outlier'lara (tek bir noktada büyük divergence) daha hassastır. 0.1 katsayısı, iki terimin göreceli ağırlığını dengeler.
+
+
+% --- L2: Energy Balance ---
+\subsection{$\mathcal{L}_{\text{energy}}$: Kinetik Enerji Dengesi}
+\label{sec:loss_energy}
+
+Kinetik enerji bütçe denklemi, NS denklemlerinin hacim ortalamasından çıkar:
+
+\begin{equation}
+    \dd{E}{t} = P_{\text{forcing}} + P_{\text{buoyancy}} - \varepsilon
+    \label{eq:energy_budget}
+\end{equation}
+Burada:
+\begin{align}
+    E &= \frac{1}{2}\langle |\vect{u}|^2 \rangle
+    && \text{(hacim-ortalama kinetik enerji)} \label{eq:KE}\\
+    Z &= \frac{1}{2}\langle |\vect{\omega}|^2 \rangle
+    && \text{(enstrophy)} \label{eq:enstrophy}\\
+    \varepsilon &= \frac{2}{\Rey} Z
+    && \text{(dissipasyon oranı)} \label{eq:dissipation}\\
+    P_{\text{forcing}} &= \langle \vect{u} \cdot \vect{F} \rangle
+    && \text{(forcing üretimi)} \label{eq:P_forcing}\\
+    P_{\text{buoyancy}} &= \langle v \cdot \Rich \cdot T' \rangle
+    && \text{(kaldırma kuvveti üretimi)} \label{eq:P_buoyancy}
+\end{align}
+$\langle \cdot \rangle$ hacim ortalamasını, $\vect{\omega} = \curl \vect{u}$ vortisiteyi gösterir.
+
+Loss fonksiyonu, bu bütçe denkleminin ihlalini ölçer:
+\begin{equation}
+    \boxed{
+        \mathcal{L}_{\text{energy}} = \left|\dd{E}{t} + \varepsilon - P_{\text{forcing}} - P_{\text{buoyancy}}\right|
+    }
+    \label{eq:loss_energy}
+\end{equation}
+
+$dE/dt$ sonlu farkla yaklaşık olarak hesaplanır: $(E^{n+1} - E^n) / \Delta t$.
+
+\textbf{Fiziksel yorum:} \"{I}statistiksel kararlı durumda $dE/dt \approx 0$ olup enerji üretimi $\approx$ dissipasyon olmalıdır. Geçici durumda ise $dE/dt \neq 0$ olabilir, ancak bütçe denklemi her zaman sağlanmalıdır.
+
+
+% --- L3: Spectrum ---
+\subsection{$\mathcal{L}_{\text{spectrum}}$: Enerji Spektrumu}
+\label{sec:loss_spectrum}
+
+Kolmogorov'un 1941 teorisine göre, inertial range'de (enerji enjeksiyon ölçeği ile dissipasyon ölçeği arasında) enerji spektrumu:
+\begin{equation}
+    E(k) \propto k^{-5/3}
+    \label{eq:kolmogorov_spectrum}
+\end{equation}
+
+Log-log ölçekte bu $-5/3$ eğimli bir doğru demektir. Loss:
+\begin{equation}
+    \boxed{
+        \mathcal{L}_{\text{spectrum}} = \left(\text{slope}\big(E(k)\big) - \left(-\tfrac{5}{3}\right)\right)^2
+    }
+    \label{eq:loss_spectrum}
+\end{equation}
+$\text{slope}(\cdot)$, inertial range'deki $\log E$--$\log k$ doğrusunun eğimidir (lineer regresyon ile).
+
+\textbf{Neden önemli?} Eğer model çok difüzif ise ($\nu_{\text{eff}}$ yüksek), küçük ölçekler yok edilir ve eğim $< -5/3$ (daha dik) olur. Eğer dissipasyon yetersiz ise, eğim $> -5/3$ (daha yatay) olur --- enerji küçük ölçeklere birikir ve patlama riski artar.
+
+
+% --- L4: Dissipation ---
+\subsection{$\mathcal{L}_{\text{dissipation}}$: Dissipasyon Tutarlılığı}
+\label{sec:loss_dissipation}
+
+\begin{equation}
+    \boxed{
+        \mathcal{L}_{\text{diss}} = \left|\varepsilon - \frac{2}{\Rey} Z\right|
+    }
+    \label{eq:loss_diss}
+\end{equation}
+
+\textbf{Türetme:} \"{I}zotropik, homojen türbülansta dissipasyon oranının enstrophy ile ilişkisi:
+\begin{equation}
+    \varepsilon = 2\nu \langle S_{ij} S_{ij} \rangle = \frac{1}{\Rey}\langle |\vect{\omega}|^2 \rangle = \frac{2}{\Rey} Z
+    \label{eq:diss_enstrophy}
+\end{equation}
+Son eşitlik, homojen türbülans için $\langle S_{ij}S_{ij} \rangle = \frac{1}{2}\langle \omega_i \omega_i \rangle$ bağıntısından gelir (periyodik domain'de geçerli). Bu loss, modelin ürettiği dissipasyon ile vortisiteden hesaplanan dissipasyonun tutarlı olmasını zorlar.
+
+
+% --- L5: Nusselt ---
+\subsection{$\mathcal{L}_{\text{nusselt}}$: Isı Transferi Kısıtı}
+\label{sec:loss_nusselt}
+
+Nusselt sayısı, konvektif ısı transferinin difüzif ısı transferine oranıdır:
+\begin{equation}
+    \Nus = 1 + \frac{\langle v \, T' \rangle}{\kappa \, \Delta T / L_y}
+    \label{eq:nusselt_def}
+\end{equation}
+$\kappa = 1/(\Rey \cdot \Pran)$ boyutsuz termal difüzivitedir. Konveksiyon, ısı transferini \textit{her zaman} artırır (veya aynı bırakır); dolayısıyla:
+\begin{equation}
+    \Nus \geq 1 \quad \text{(fiziksel zorunluluk)}
+    \label{eq:nu_constraint}
+\end{equation}
+
+Loss fonksiyonu:
+\begin{equation}
+    \boxed{
+        \mathcal{L}_{\text{nusselt}} = \big[\text{relu}(1 - \Nus)\big]^2
+    }
+    \label{eq:loss_nusselt}
+\end{equation}
+$\text{relu}(x) = \max(0, x)$. Eğer $\Nus \geq 1$ ise loss $= 0$ (ihlal yok); $\Nus < 1$ ise c\ eza uygulanır.
+
+\begin{remark}
+Bu loss fonksiyonunun önemli bir zayıflığı vardır: $\Nus \geq 1$ sağlandığı anda gradient sıfır olur. Dolayısıyla model, $\Nus = 1.001$ ile tatmin olur ve daha yüksek $\Nus$ değerlerini (ki fiziksel olarak beklenir) öğrenmez. Gelecek versiyonda $\Nus$'u hedef bir aralığa çekecek daha bilgilendirici bir loss kullanmak düşünülebilir.
+\end{remark}
+
+
+% --- L6: Thermal Variance ---
+\subsection{$\mathcal{L}_{\text{thermal}}$: Sıcaklık Patlamasi Önleme}
+\label{sec:loss_thermal}
+
+\begin{equation}
+    \boxed{
+        \mathcal{L}_{\text{thermal}} = \big[\text{relu}\big(\text{var}(T') - \text{var}_{\max}\big)\big]^2
+    }
+    \label{eq:loss_thermal}
+\end{equation}
+
+$\text{var}(T') = \langle T'^2 \rangle - \langle T' \rangle^2$ hacim varyansıdır. $\text{var}_{\max}$ probleme bağlı bir üst sınırdır.
+
+\textbf{Neden gerekli?} Sıcaklık pertürbasyonunun kontrolsüz büyümesi, momentum denklemindeki buoyancy terimi ($\Rich \cdot T'$) üzerinden hız alanını da patlatabilir. Bu loss, $T'$'nin varyansını fiziksel sınırlar içinde tutar.
+
+
+% --- L7: Stability ---
+\subsection{$\mathcal{L}_{\text{stability}}$: Enstrophy Patlamasi Önleme}
+\label{sec:loss_stability}
+
+\begin{equation}
+    \boxed{
+        \mathcal{L}_{\text{stability}} = \big[\text{relu}(Z / Z_{\text{ref}} - 10)\big]^2
+    }
+    \label{eq:loss_stability}
+\end{equation}
+
+$Z_{\text{ref}}$, eğitim başlangıcındaki referans enstrophy değeridir. Enstrophy'nin referansın 10 katını aşması fiziksel olmayan bir patlamaya işaret eder.
+
+\begin{remark}
+Bu loss da tek yönlüdür: $Z < 10 Z_{\text{ref}}$ olunca gradient yoktur. Ayrıca, eğer eşik çok düşük seçilirse ($Z_{\text{ref}}$ küçükse), bu loss türbülansın gelişmesini \textit{aktif olarak engelleyebilir}. Bu, 63 saatlik başarısız eğitimde görülen sorunlardan biridir.
+\end{remark}
+
+
+% ============================================================
+\section{Toplam Loss}
+\label{sec:total_loss}
+
+\begin{equation}
+    \mathcal{L}_{\text{total}} = \sum_{i=1}^{7} w_i \, \mathcal{L}_i
+    \label{eq:total_loss}
+\end{equation}
+
+Ağırlıklar $w_i$, curriculum learning'e göre değişir (sonraki bölüm). Tüm loss'lar aynı anda açık olmaz.
+
+
+% ============================================================
+\section{Curriculum Learning}
+\label{sec:curriculum}
+
+Tüm loss'ları aynı anda açmak, gradient çatışmasına (gradient conflict) yol açar: farklı loss'lar farklı yönlere gradient üretir ve optimizer hangi yöne gideceğini bilemez. Çözüm: kademeli olarak zorluk artırmak.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{curriculum_phases.png}
+\caption{Curriculum learning fazları. Her faz farklı loss fonksiyonlarını aktifleştirir ve farklı Re/Ra aralıklarında çalışır.}
+\label{fig:curriculum_phases}
+\end{figure}
+
+\subsection{Faz A: Temel Fizik (Epoch 0--3\,000)}
+
+\begin{itemize}
+    \item \textbf{Aktif loss'lar:} $\mathcal{L}_{\text{div}}$, $\mathcal{L}_{\text{thermal}}$
+    \item \textbf{Hedef:} Modelin kütle korunumunu öğrenmesi ve sıcaklık alanının patlamaması.
+    \item \textbf{$\Rey$, $\Ray$:} Sabit, düşük değerler ($\Rey = 5000$, $\Ray = 10^5$).
+\end{itemize}
+
+Bu fazda model, ``temel mekanik'' kurallarını öğrenir: hız alanı divergence-free olmalı, sıcaklık patlamamalı. Enerji spektrumu veya Nusselt sayısına bakılmaz.
+
+\subsection{Faz B: Enerji ve Spektrum (Epoch 3\,000--8\,000)}
+
+\begin{itemize}
+    \item \textbf{Aktif loss'lar:} Öncekiler + $\mathcal{L}_{\text{energy}}$, $\mathcal{L}_{\text{spectrum}}$, $\mathcal{L}_{\text{diss}}$, $\mathcal{L}_{\text{nusselt}}$, $\mathcal{L}_{\text{stability}}$
+    \item \textbf{Açma yöntemi:} Ramp-up --- ağırlıklar sıfırdan yavaşça yükseltilir:
+    \begin{equation}
+        w_i(\text{epoch}) = w_{i,\text{max}} \cdot \min\!\left(1, \;\frac{\text{epoch} - 3000}{2000}\right)
+        \label{eq:ramp_up}
+    \end{equation}
+    \item \textbf{Hedef:} Enerji dengesi, Kolmogorov spektrumu, dissipasyon tutarlılığı.
+    \item \textbf{$\Rey$, $\Ray$:} Hala düşük veya orta değerler.
+\end{itemize}
+
+\subsection{Faz C: Tam Fizik (Epoch 8\,000--15\,000)}
+
+\begin{itemize}
+    \item \textbf{Aktif loss'lar:} Tümü tam ağırlıkla.
+    \item \textbf{$\Rey$, $\Ray$ sweep:} Her epoch'ta rastgele seçim (bölüm~\ref{sec:re_ra_sweep}).
+    \item \textbf{Hedef:} Geniş parametre uzayında genelleştirme.
+\end{itemize}
+
+\subsection{Faz D: Non-Boussinesq (Epoch 15\,000--22\,000)}
+
+\begin{itemize}
+    \item \textbf{Ek loss'lar:} Kütle korunumu ($d\rho/dt + \divergence(\rho \vect{u}) = 0$), durum denklemi ($p = \rho R T$), global kütle korunumu.
+    \item \textbf{Hedef:} Büyük sıcaklık farklarında Boussinesq'in geçerliliğinin ötesine geçmek.
+    \item \textbf{Not:} Bu faz, projenin opsiyonel ileri hedefidir.
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{Curriculum fazları özeti.}
+\label{tab:curriculum}
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Faz} & \textbf{Epoch} & \textbf{Loss'lar} & \textbf{$\Rey$ / $\Ray$} \\
+\midrule
+A & $0$--$3$K & $\mathcal{L}_{\text{div}}$, $\mathcal{L}_{\text{thermal}}$ & Sabit, düşük \\
+B & $3$K--$8$K & + enerji, spektrum, diss., nusselt, stab. (ramp) & Düşük--orta \\
+C & $8$K--$15$K & Tümü tam ağırlık & Sweep \\
+D & $15$K--$22$K & + Non-Boussinesq & Sweep \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+% ============================================================
+\section{Re/Ra Sweep}
+\label{sec:re_ra_sweep}
+
+Tek bir modelin farklı fiziksel koşullarda çalışması için, eğitim sırasında $\Rey$ ve $\Ray$ sistematik olarak değiştirilir.
+
+\subsection{Mekanizma}
+
+Her epoch'un başında rastgele seçim:
+\begin{equation}
+    \Rey \in \{5000, 7000, 10000\}, \quad \Ray \in \{10^5, 10^6, 10^7\}
+    \label{eq:sweep_values}
+\end{equation}
+Seçilen değerler modele uygulanır:
+\begin{equation}
+    \texttt{model.set\_physics}(\Rey, \Ray) \implies
+    \begin{cases}
+        \nu = 1/\Rey \\
+        \kappa = 1/(\Rey \cdot \Pran) \\
+        \Rich = \Ray / (\Rey^2 \cdot \Pran)
+    \end{cases}
+    \label{eq:set_physics}
+\end{equation}
+
+\subsection{Neden Randomize?}
+
+Sabit sırayla geçmek (\"once $\Rey = 5000$, sonra $7000$, sonra $10000$) ``catastrophic forgetting''e yol açabilir: model son gördüğü parametreye uzmanlaşır ve öncekini unutur. Rastgele seçim, tüm parametrelerin dengeli biçimde eğitilmesini sağlar.
+
+\subsection{Tek Model, 9 Rejim}
+
+$3 \times 3 = 9$ farklı $(\Rey, \Ray)$ kombinasyonu vardır. Her biri farklı bir akış rejimini temsil eder (Tablo~\ref{tab:Ri_values}). Tek INNATE modeli, tüm bu rejimlerde fiziksel olarak tutarlı sonuçlar üretmelidir. Bu, modelin parametrelerinin $(\Rey, \Ray)$'ya göre ``anlamlı'' adaptasyon yapmasını gerektirir.
+
+
+% ============================================================
+\section{Optimizer ve Hiperparametreler}
+\label{sec:optimizer}
+
+\subsection{AdamW}
+
+\begin{equation}
+    \theta_{t+1} = \theta_t - \eta \left(\frac{\hat{m}_t}{\sqrt{\hat{v}_t} + \varepsilon} + \lambda \, \theta_t\right)
+    \label{eq:adamw}
+\end{equation}
+\begin{itemize}
+    \item $\eta = 3 \times 10^{-4}$: learning rate
+    \item $\lambda = 10^{-4}$: weight decay (decoupled, AdamW)
+    \item $\beta_1 = 0.9$, $\beta_2 = 0.999$: moment tahmin katsayıları
+    \item $\varepsilon = 10^{-8}$: sayısal kararlılık
+\end{itemize}
+
+AdamW'nin (decoupled weight decay) tercih nedeni: Adam + $L_2$ regularizasyonda weight decay adaptif öğrenme oranıyla etkileşir ve beklenmeyen davranışlara yol açabilir. AdamW'de weight decay, gradient güncellemesinden bağımsızdır.
+
+\subsection{Learning Rate Şeması}
+
+\textbf{Warmup (0--200 epoch):}
+\begin{equation}
+    \eta_t = \eta_{\max} \cdot \frac{t}{200}
+    \label{eq:warmup}
+\end{equation}
+Sıfırdan başlayarak lineer olarak artırılır. Neden? Başlangıçta parametreler rastgele civarda olup büyük learning rate gradientleri patlatır.
+
+\textbf{Cosine annealing (200+ epoch):}
+\begin{equation}
+    \eta_t = \eta_{\min} + \frac{1}{2}(\eta_{\max} - \eta_{\min}) \left(1 + \cos\frac{\pi \, t}{T}\right)
+    \label{eq:cosine_annealing}
+\end{equation}
+Yavaşça düşer, sıfıra yakın bitmez (çok küçük $\eta_{\min}$ ile biter).
+
+\subsection{Gradient Clipping}
+\begin{equation}
+    \vect{g}_{\text{clip}} = \vect{g} \cdot \min\!\left(1, \; \frac{\text{max\_norm}}{\|\vect{g}\|_2}\right), \quad \text{max\_norm} = 1.0
+    \label{eq:grad_clip}
+\end{equation}
+Gradient normu 1'i aştığında ölçeklenir. Unrolled time-stepping'de (20 adım) gradient'ler patlayabilir; clipping bunu önler.
+
+\subsection{Batch Size ve Unrolling}
+
+\begin{itemize}
+    \item \textbf{Batch size:} 1 (tek simülasyon).
+    \item \textbf{Unroll length:} 20 zaman adımı.
+\end{itemize}
+
+Bir eğitim iterasyonunda model 20 adım ileri çalıştırılır; loss, bu 20 adımın ortalamasıdır. Backpropagation, 20 katmanlık bir ağdan geri geçer. Bu ``unrolled'' yaklaşım, modelin kısa vadeli tahmin yerine çok adımlı evrimde tutarlı olmasını zorlar.
+
+\begin{remark}
+Unroll length 20'dir, 1 değil. Tek adımlık eğitimde model, her adımda bağımsız optimize eder ve birikimli hataları öğrenemez. 20 adımlık unrolling, autoregressive error accumulation'ı doğrudan loss'a yansıtır.
+\end{remark}
+
+
+% ============================================================
+\section{63 Saatlik Başarısız Eğitimden Dersler}
+\label{sec:basarisiz_egitim}
+
+Projenin erken versiyonunda 63 saat süren bir eğitim çalışılmış; sonuçlar başarısız olmuştur. Tespit edilen sorunlar ve çıkarılan dersler:
+
+\begin{enumerate}
+    \item \textbf{EddyViscosity3D kapalıydı:} $96 \times 160 \times 64$ grid, $\Rey = 10{,}000$'de DNS çözünürlüğünden çok uzaktır. Subgrid-scale model olmadan, çözülemeyen modlara enerji birikti ve adım 280'de NaN oluştu. \textbf{Ders:} LES nöronu zorunludur.
+
+    \item \textbf{Nusselt loss tek yönlü:} $\text{relu}(1 - \Nus)^2$ formunda $\Nus \geq 1$ olunca gradient sıfırdır. Model, termal coupling'i öğrenemedi; $\Nus = 1.0$ (saf difüzyon) seviyesinde kaldı. \textbf{Ders:} Tek yönlü loss'lar dikkatle kullanılmalı.
+
+    \item \textbf{Stability loss türbülansı engelledi:} $\text{relu}(Z/Z_{\text{ref}} - 10)^2$ formunda, eğer $Z_{\text{ref}}$ küçükse, enstrophy'nin normal türbülant seviyeye ulaşması bile ``patlama'' olarak algılanır ve model türbülansı aktif olarak bastırır. \textbf{Ders:} Referans değerleri dikkatle kalibre edilmeli.
+
+    \item \textbf{Model \%99.7 MLP:} 10,116 / 10,144 parametre MLP'de (PhysicsModulatorMC) olup fizik nöronlarının öğrenilebilir parametreleri cok azınlıktaydı. MLP, 6 global skalerden (E, Z, div, t, T\_mean, Ri) 3 scale faktörü üretmeye çalışıyordu --- yeterli bilgi değil. \textbf{Ders:} MLP kaldırılıp saf INNATE mimarisine geçildi.
+\end{enumerate}
+
+
+% ============================================================
+\section{Bölüm Özeti}
+\label{sec:training_ozet}
+
+\begin{itemize}
+    \item Eğitimde DNS verisi kullanılmaz; 7 fizik tabanlı loss fonksiyonu parametreleri kalibre eder.
+    \item Divergence, enerji dengesi, Kolmogorov spektrumu, dissipasyon, Nusselt, termal varyans ve enstrophy kararlılığı zorlanır.
+    \item 4 fazlı curriculum: temel fizik $\to$ enerji/spektrum $\to$ tam fizik/sweep $\to$ non-Boussinesq.
+    \item Re/Ra sweep ile tek model 9 farklı rejimde eğitilir.
+    \item AdamW ($\eta = 3 \times 10^{-4}$), warmup + cosine annealing, gradient clipping.
+    \item 20 adımlık unrolled training, batch size 1.
+    \item Geçmiş başarısızlıktan çıkarılan dersler: LES zorunlu, tek yönlü loss'lar dikkatli kullanılmalı, MLP yerine saf fizik.
+\end{itemize}

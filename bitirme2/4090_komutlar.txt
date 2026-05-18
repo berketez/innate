@@ -1,0 +1,136 @@
+============================================================
+4090 KOMUT LİSTESİ — Cursor terminal'e kopyala/yapıştır
+============================================================
+
+Python yolu: C:\Users\berke\AppData\Local\Programs\Python\Python311\python.exe
+GPU: RTX 4090 Laptop, 17 GB VRAM, CUDA 11.8
+============================================================
+
+
+--- ADIM 0: HER YENİ TERMİNAL OTURUMUNDA ÖNCE BUNLARI YAZ ---
+
+cd /d C:\Users\berke\Desktop\nsneuron1\bitirme2
+set PYTHONPATH=C:\Users\berke\Desktop\nsneuron1
+set PYTHONIOENCODING=utf-8
+set PY="C:\Users\berke\AppData\Local\Programs\Python\Python311\python.exe"
+
+
+--- ADIM 1: HIZLI SAĞLIK TESTİ (30 saniye, atlanabilir) ---
+
+%PY% -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available(), torch.cuda.get_device_name(0))"
+%PY% _check_tier1.py
+
+
+--- ADIM 2: LES SİMÜLASYONU (60K step, ~25-35 dk) ---
+# Re=10K, Ra=1e5, Cs=0.17 (gerçek LES referansı, Nu=70 hedefi)
+
+%PY% viz_pipeline\01_les_aggressive.py --Re 10000 --Ra 1e5 --Cs 0.17 --n-steps 60000 --snapshot-every 10 --output data\sim_states\les_real_60k.npz --device cuda
+
+# Beklenen: data\sim_states\les_real_60k.npz oluşur (~2-3 GB)
+# Steady-state'te Nu ~70, theta_rms ~0.027, TKE ~0.007 olmalı
+
+
+--- ADIM 3: LES RENDER (2D + 3D SIRALI, ~75-110 dk total) ---
+# LES bittikten SONRA çalıştır — bat dosyası 2D'yi (15-20 dk) sonra 3D'yi (60-90 dk) yapar
+
+run_renders.bat
+
+# Veya manuel:
+# %PY% viz_pipeline\03_render_ansys.py --les data\sim_states\les_real_60k.npz --output data\sim_states\les_only_30s_4k.mp4 --les-duration 30 --transition-duration 0 --innate-duration 0 --fps 60
+# %PY% viz_pipeline\04_render_3d.py --input data\sim_states\les_real_60k.npz --output data\sim_states\les_only_60s_4k_3D.mp4 --label "LES Referansi (Smagorinsky SGS, Re=10K, Cs=0.17)" --duration 60 --fps 60 --rotate --bitrate 40M
+
+# Beklenen ciktilar:
+#   - les_only_30s_4k.mp4    (2D matplotlib, ~80-150 MB)
+#   - les_only_60s_4k_3D.mp4 (3D PyVista volume, ~600-1200 MB)
+# Iki video bittikten sonra Mac'e indir (asagida scp komutu)
+
+
+--- ADIM 4: INNATE EĞİTİMİ (6-8 saat, gece bırakılabilir) ---
+# 100 epoch, 2000 step rollout, Tier 1+2+3 aktif (kanonik freeze + PDE residual + 5-loss minimal)
+
+%PY% train.py --max-epochs 100 --num-steps 2000 --proportional-curriculum --freeze-forcing
+
+# Bekle: ~6-8 saat
+# Checkpoint: results_v2\checkpoints\checkpoint_epoch000099.pt
+# Mac'e indirmek istersen: scp 4090:.../checkpoint_epoch000099.pt ./
+
+
+--- ADIM 5: INNATE ROLLOUT (eğitim sonrası, ~10-15 dk) ---
+# Eğitilmiş model ile aynı IC'den rollout (LES ile birebir karşılaştırılabilir)
+
+%PY% viz_pipeline\02_innate_rollout.py --checkpoint results_v2\checkpoints\checkpoint_epoch000099.pt --Re 10000 --Ra 1e5 --n-steps 2000 --snapshot-every 1 --output data\sim_states\innate_rollout.npz --device cuda
+
+# Beklenen: data\sim_states\innate_rollout.npz (~500 MB)
+
+
+--- ADIM 6: FİNAL BİRLEŞİK RENDER (LES + INNATE, 60 sn 4K@60fps, ~30-40 dk) ---
+# --les-tail 200: LES'in steady-state son 200 frame'ini kullan (INNATE 100 step ile zaman senkron)
+# Çünkü LES 60K step = 1200 zaman birim, INNATE 100 step = 40 zaman birim — aynı zaman dilimi gerek
+
+%PY% viz_pipeline\03_render_ansys.py --les data\sim_states\les_real_60k.npz --innate data\sim_states\innate_rollout.npz --output data\sim_states\comparison_4k_60fps.mp4 --les-duration 28 --transition-duration 2 --innate-duration 28 --fps 60 --les-tail 200
+
+# Beklenen: data\sim_states\comparison_4k_60fps.mp4 (~1-2 GB)
+# 28 sn LES + 2 sn geçiş + 28 sn INNATE = 58 sn toplam
+# LES son ~40 zaman birimi (steady-state) + INNATE 40 zaman birimi → birebir karşılaştırılabilir
+
+
+============================================================
+SONUCU MAC'E İNDİRME (her adımdan sonra opsiyonel)
+============================================================
+# Mac terminalden:
+scp 4090:/Users/berke/Desktop/nsneuron1/bitirme2/data/sim_states/les_only_30s_4k.mp4 ~/Desktop/
+scp 4090:/Users/berke/Desktop/nsneuron1/bitirme2/data/sim_states/comparison_4k_60fps.mp4 ~/Desktop/
+
+
+============================================================
+BİR HATA OLURSA — ÇÖZÜM REHBERİ
+============================================================
+
+1. "ImportError: cannot import name X"
+   → PYTHONPATH set edilmemiş, ADIM 0'i tekrar çalıştır
+
+2. "CUDA out of memory"
+   → Önce diğer python süreçlerini kapat: taskkill /IM python.exe /F
+   → num-steps düşür (2000 → 1000)
+
+3. "FileNotFoundError: les_real_60k.npz"
+   → ADIM 2 tamamlanmamış, kontrol: dir data\sim_states
+
+4. NaN değerleri eğitimde
+   → İlk 3 epoch çıktısını bana yapıştır
+
+5. Render donuyor / yavaş
+   → matplotlib backend sorunu olabilir, Mac'te render etmek alternatif
+
+
+============================================================
+TIMING ÖZETİ
+============================================================
+ADIM 1: 30 sn (sağlık test)
+ADIM 2: 25-35 dk (LES)
+ADIM 3: 15-20 dk (LES test render)
+ADIM 4: 6-8 saat (INNATE eğitim)
+ADIM 5: 10-15 dk (INNATE rollout)
+ADIM 6: 30-40 dk (final render)
+TOPLAM: ~8-10 saat (eğitim dahil)
+TOPLAM: ~1.5 saat (sadece görselleştirme, eğitim atlanırsa)
+
+
+============================================================
+TAVSİYE — SIRA
+============================================================
+1. ADIM 1 (test) → her şey çalışıyor mu?
+2. ADIM 2 (LES) + ADIM 3 (test render)
+   → Bu ~50 dk. İlk videoyu görüp kalite onaylarsın.
+3. Beğenirsen → ADIM 4 (eğitim) başlat, gece bırak
+4. Sabah uyandığında → ADIM 5 (INNATE rollout) + ADIM 6 (final render)
+
+
+============================================================
+ÖNEMLİ
+============================================================
+- ADIM 4 (eğitim) ARKA PLANDA çalışırken paralel başka şey yapma
+  (VRAM dolar, LES/render ekstra çakışır)
+- ADIM 6 öncesi mutlaka ADIM 5 tamamlanmalı
+- Her adımda log mesajını oku, NaN veya Error varsa dur
+============================================================

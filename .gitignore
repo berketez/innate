@@ -1,0 +1,98 @@
+# ============================================================
+# Büyük dosyalar (GitHub 100 MB sınırı)
+# ============================================================
+*.mp4
+*.npz
+*.pt
+*.bin
+*.zip
+*.exe
+*.pack
+*.geojson
+*.shp
+*.dbf
+*.shx
+*.cpg
+*.prj
+
+# ============================================================
+# Python derleme
+# ============================================================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.Python
+.pytest_cache/
+.mypy_cache/
+
+# ============================================================
+# Eğitim/Eval çıktıları (sadece tezdeki final PNG'ler tutulur)
+# ============================================================
+bitirme2/results/
+bitirme2/results_v2/
+bitirme2/data/renders/
+bitirme2/logs/
+bitirme2/checkpoints*/
+bitirme2/4090_sync/
+bitirme2/diagnostics/
+bitirme2/demos/
+
+# ============================================================
+# LES referans verisi (GB mertebesinde npz + pt)
+# ============================================================
+bitirme2/les_reference/
+
+# ============================================================
+# Eski / arşiv (tarihsel kayıt)
+# ============================================================
+bitirme2/archive/
+bitirme2/v3/
+bitirme2/_check_*.py
+bitirme2/_evidence_*.py
+bitirme2/blackbox_test.py
+
+# ============================================================
+# Dış kaynak benchmark'lar (kendi git repo'ları var)
+# ============================================================
+bitirme2/benchmarks/
+
+# ============================================================
+# Tez build artifacts (PDF kalıyor, ara dosyalar dışlanır)
+# ============================================================
+bitirme2/tez_final/*.aux
+bitirme2/tez_final/*.log
+bitirme2/tez_final/*.toc
+bitirme2/tez_final/*.out
+bitirme2/tez_final/*.synctex.gz
+bitirme2/tez_final/*.fls
+bitirme2/tez_final/*.fdb_latexmk
+bitirme2/tez_final/*.bbl
+bitirme2/tez_final/*.blg
+bitirme2/tez_final/videolar/
+
+# ============================================================
+# OS / IDE
+# ============================================================
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*~
+
+# ============================================================
+# Claude / oturum dosyaları
+# ============================================================
+.claude-project
+CLAUDE.md
+.claude/
+
+# ============================================================
+# Geçici
+# ============================================================
+/tmp/
+tmp/
+*.tmp
+*.bak

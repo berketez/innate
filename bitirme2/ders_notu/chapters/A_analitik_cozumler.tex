@@ -1,0 +1,341 @@
+\chapter{Analitik Çözümler}
+\label{ch:analitik}
+
+Bu ekte, projemizle ilgili temel analitik çözümleri adım adım türetiyoruz. Bu çözümler, sayısal kodun doğrulanmasında ve INNATE modelinin limit davranışlarının kontrolünde kullanılır.
+
+
+%% ============================================================
+\section{Kolmogorov Akışı (Laminar, 2B)}
+\label{sec:kolmogorov_analitik}
+
+\subsection{Problem Tanımı}
+
+Kolmogorov akışı, periyodik bir kutuda sinusoidal body forcing ile sürülen 2B bir akıştır:
+\begin{equation}
+    \vect{F} = A \sin\!\left(\frac{k_f \cdot 2\pi y}{L_y}\right) \hat{\vect{e}}_x
+\end{equation}
+Laminer (kararlı) halde akış yalnızca $x$-yönünde ve $y$'ye bağlıdır: $\vect{u} = u(y) \, \hat{\vect{e}}_x$. Burada $\tilde{k}_f \equiv k_f \cdot 2\pi / L_y$ etkin dalga sayısıdır.
+
+\subsection{Türetme}
+
+$\tilde{k}_f = k_f \cdot 2\pi / L_y$ kısaltımıyla forcing: $F_x = A\sin(\tilde{k}_f y)$. Kararlı hal ve $u = u(y)$ varsayımıyla Navier--Stokes denkleminin $x$-bileşeni:
+\begin{equation}
+    \underbrace{\pd{u}{t}}_{=\,0} + \underbrace{u \pd{u}{x}}_{=\,0} + \underbrace{v \pd{u}{y}}_{=\,0} = -\underbrace{\pd{p}{x}}_{=\,0} + \nu \underbrace{\laplacian u}_{\nu \, u''(y)} + A\sin(\tilde{k}_f y)
+\end{equation}
+
+\textbf{Neden bu terimler sıfır?}
+\begin{itemize}
+    \item $\partial u/\partial t = 0$: kararlı hal.
+    \item $u \, \partial u/\partial x = 0$: $u$ sadece $y$'ye bağlı, $\partial u/\partial x = 0$.
+    \item $v \, \partial u/\partial y$: süreklilik $\partial u/\partial x + \partial v/\partial y = 0$ ve $\partial u/\partial x = 0$ $\Rightarrow$ $\partial v/\partial y = 0$. Periyodik BC ile $v = 0$.
+    \item $\partial p/\partial x = 0$: periyodik BC ve simetri nedeniyle.
+\end{itemize}
+
+Geriye kalan denklem:
+\begin{equation}
+    \boxed{0 = \nu \, \frac{d^2 u}{d y^2} + A \sin(\tilde{k}_f y)}
+    \label{eq:kolmogorov_ode}
+\end{equation}
+
+Bu ikinci derece ODE'yi çözmek için bir çözüm öneriyoruz:
+\begin{equation}
+    u(y) = C \sin(\tilde{k}_f y)
+\end{equation}
+Türevleri:
+\begin{align}
+    u'(y) &= C \, \tilde{k}_f \cos(\tilde{k}_f y) \\
+    u''(y) &= -C \, \tilde{k}_f^2 \sin(\tilde{k}_f y)
+\end{align}
+
+(\ref{eq:kolmogorov_ode})'e yerleştirelim:
+\begin{equation}
+    0 = \nu \left( -C \, \tilde{k}_f^2 \sin(\tilde{k}_f y) \right) + A \sin(\tilde{k}_f y)
+\end{equation}
+\begin{equation}
+    0 = \left( -\nu C \tilde{k}_f^2 + A \right) \sin(\tilde{k}_f y)
+\end{equation}
+
+Bu tüm $y$ için sağlanmalıdır, dolayısıyla:
+\begin{equation}
+    -\nu C \tilde{k}_f^2 + A = 0 \quad \Longrightarrow \quad C = \frac{A}{\nu \tilde{k}_f^2}
+\end{equation}
+
+\subsection{Sonuç}
+
+\begin{equation}
+    \boxed{u(y) = \frac{A}{\nu \, \tilde{k}_f^2} \sin(\tilde{k}_f y), \qquad \tilde{k}_f = \frac{k_f \cdot 2\pi}{L_y}}
+    \label{eq:kolmogorov_solution}
+\end{equation}
+
+\textbf{Fiziksel yorum:}
+\begin{itemize}
+    \item Akış hızı, forcing genliğiyle ($A$) orantılı, viskoziteyle ($\nu$) ters orantılıdır. Beklendiği gibi.
+    \item Yüksek dalga sayısı ($\tilde{k}_f$) daha zayıf akış üretir ($\tilde{k}_f^2$'ye ters) --- kısa dalgalar difüzyonla daha hızlı sönümlenir.
+    \item Maksimum hız: $u_{\max} = A/(\nu \tilde{k}_f^2) = A \Rey / \tilde{k}_f^2$ (boyutsuz birimde $\nu = 1/\Rey$).
+\end{itemize}
+
+\subsection{İnstabilite Eşiği}
+
+Kolmogorov akışı bir kritik $\Rey$ üzerinde kararsız hale gelir. Lineer stabilite analizinden (Meshalkin ve Sinai, 1961):
+\begin{equation}
+    \Rey_{\text{cr}} = \sqrt{2} \approx 1.414
+    \label{eq:kolmogorov_recr}
+\end{equation}
+Burada $\Rey = u_{\max} L / \nu = A L / (\nu^2 k_f^2)$ şeklinde tanımlıdır ($L$ periyot). Bizim parametrelerimizde $\Rey = 1000 \gg \Rey_{\text{cr}}$, dolayısıyla akış kesinlikle türbülant.
+
+
+%% ============================================================
+\section{Rayleigh--B\'{e}nard Lineer Stabilite Analizi}
+\label{sec:rb_stability}
+
+\subsection{Problem Tanımı}
+
+İki yatay plaka arasında sıvı: alt plaka sıcak ($T_h$), üst plaka soğuk ($T_c$). Soru: hangi koşulda hareketsiz iletim çözümü kararsız hale gelir ve konveksiyon başlar?
+
+\subsection{Temel Çözüm (Hareketsiz)}
+
+Hareketsiz hal: $\vect{u} = 0$, sıcaklık lineer profil:
+\begin{equation}
+    T_0(y) = T_h - \frac{\Delta T}{H} \, y, \qquad \Delta T = T_h - T_c
+\end{equation}
+
+\subsection{Perturbasyonlar}
+
+Küçük perturbasyonlar ekleyelim:
+\begin{equation}
+    \vect{u} = \vect{u}'(x,y,z,t), \qquad T = T_0(y) + T'(x,y,z,t)
+\end{equation}
+Boussinesq denklemlerine yerleştirip linearize edelim (nonlineer terimleri ihmal):
+\begin{align}
+    \pd{\vect{u}'}{t} &= -\gradient p' + \nu \laplacian \vect{u}' + \beta g \, T' \, \hat{\vect{e}}_y \label{eq:rb_momentum} \\
+    \pd{T'}{t} &= \kappa \laplacian T' - v' \, \frac{dT_0}{dy} \label{eq:rb_energy}
+\end{align}
+$dT_0/dy = -\Delta T/H$ olduğundan, enerji denklemindeki kaynak terimi:
+\begin{equation}
+    -v' \, \frac{dT_0}{dy} = v' \frac{\Delta T}{H}
+\end{equation}
+Bu terim pozitif: dikey hız ($v' > 0$, yukarı), sıcak bölgeden soğuk bölgeye sıcaklık taşır $\to$ perturbasyonu büyütür (destabilize).
+
+\subsection{Normal Mod Analizi}
+
+Perturbasyonları şu formda arayız:
+\begin{equation}
+    \begin{pmatrix} \vect{u}' \\ T' \end{pmatrix} = \begin{pmatrix} \hat{\vect{u}}(y) \\ \hat{T}(y) \end{pmatrix} \exp\!\left( \sigma t + i k_x x + i k_z z \right)
+    \label{eq:normal_modes}
+\end{equation}
+$\sigma$ büyüme hızı, $k_x, k_z$ yatay dalga sayılarıdır. $\text{Re}(\sigma) > 0$ ise perturbasyonlar büyür (kararsızlık).
+
+Divergence-free koşulu ve momentumun $y$-bileşenine odaklanarak, $\hat{v}(y)$ için bir 6.\ derece ODE elde edilir. Bu ODE, $y$-yönündeki sınır koşullarına bağlı bir özdeğer problemidir.
+
+\subsection{Free-Free Sınır Koşulları (Çözülebilir Durum)}
+
+$\hat{v}(0) = \hat{v}(H) = 0$, $\hat{v}''(0) = \hat{v}''(H) = 0$ (stress-free). Bu durumda $\hat{v}(y) = V_0 \sin(n\pi y/H)$ formu tam çözüm verir.
+
+Marginal stabilite koşulu ($\sigma = 0$) için:
+\begin{equation}
+    \Ray = \frac{(k^2 + n^2 \pi^2)^3}{k^2}
+    \label{eq:ra_free_free}
+\end{equation}
+burada $k^2 = k_x^2 + k_z^2$ (yatay toplam dalga sayısı) ve boyutsuzlaştırma $H = 1$ alınmıştır.
+
+En küçük $\Ray$'yı bulmak için: $n = 1$ (en düşük mod) ve $d\Ray/dk^2 = 0$:
+\begin{equation}
+    \dd{\Ray}{k^2} = \frac{d}{dk^2} \frac{(k^2 + \pi^2)^3}{k^2} = 0
+\end{equation}
+Açalım. $\alpha = k^2$ diyelim:
+\begin{equation}
+    \Ray(\alpha) = \frac{(\alpha + \pi^2)^3}{\alpha}
+\end{equation}
+\begin{equation}
+    \dd{\Ray}{\alpha} = \frac{3(\alpha + \pi^2)^2 \cdot \alpha - (\alpha + \pi^2)^3}{\alpha^2} = \frac{(\alpha + \pi^2)^2 [3\alpha - (\alpha + \pi^2)]}{\alpha^2}
+\end{equation}
+\begin{equation}
+    = \frac{(\alpha + \pi^2)^2 (2\alpha - \pi^2)}{\alpha^2} = 0
+\end{equation}
+$\alpha + \pi^2 \neq 0$ olduğundan: $2\alpha - \pi^2 = 0 \Rightarrow \alpha = k_c^2 = \pi^2/2$.
+
+Kritik $\Ray$:
+\begin{equation}
+    \Ray_{\text{cr}} = \frac{(\pi^2/2 + \pi^2)^3}{\pi^2/2} = \frac{(3\pi^2/2)^3}{\pi^2/2} = \frac{27\pi^6/8}{\pi^2/2} = \frac{27\pi^4}{4}
+\end{equation}
+
+\begin{equation}
+    \boxed{\Ray_{\text{cr}}^{\text{free-free}} = \frac{27\pi^4}{4} \approx 657.5}
+    \label{eq:ra_cr_free}
+\end{equation}
+
+Kritik dalga sayısı: $k_c = \pi/\sqrt{2} \approx 2.22$.
+
+\subsection{Rigid-Rigid Sınır Koşulları}
+
+$\hat{v}(0) = \hat{v}(H) = 0$, $\hat{v}'(0) = \hat{v}'(H) = 0$ (no-slip). Bu durumda analitik çözüm yoktur; sayısal özdeğer problemi çözülür:
+\begin{equation}
+    \Ray_{\text{cr}}^{\text{rigid-rigid}} \approx 1708
+    \label{eq:ra_cr_rigid}
+\end{equation}
+
+\subsection{Periyodik Sınır Koşulları (Bizim Durumumuz)}
+
+Bizim problemimizde tüm yönlerde periyodik BC vardır. Bu durumda ``üst'' ve ``alt'' plaka fiziği yoktur; sıcaklık farkı $T_{\text{base}}(y)$ profili üzerinden empoze edilir. En düşük kararsız mod, kutunun geometrisine ($L_x, L_y, L_z$) bağlıdır. Etkin $\Ray_{\text{cr}}$, free-free değerinden düşüktür çünkü periyodik BC daha az kısıtlayıcıdır.
+
+
+%% ============================================================
+\section{1B Isı İletimi}
+\label{sec:heat_conduction}
+
+\subsection{Kararlı Hal}
+
+Sıcaklık denklemi 1B'de ve kararlı halde:
+\begin{equation}
+    0 = \kappa \frac{d^2 T}{d y^2}
+\end{equation}
+Çözüm: $T(y)$ en fazla birinci derece polinom olabilir. Sınır koşulları $T(0) = T_h$, $T(L_y) = T_c$ ile:
+\begin{equation}
+    T(y) = T_h - \frac{\Delta T}{L_y} \, y = T_h - \frac{T_h - T_c}{L_y} \, y
+\end{equation}
+
+Bu tam olarak bizim $T_{\text{base}}(y)$ profilimizdir:
+\begin{equation}
+    \boxed{T_{\text{base}}(y) = T_h - \frac{\Delta T}{L_y} \, y}
+    \label{eq:tbase}
+\end{equation}
+
+\textbf{Fiziksel anlam:} Akış olmasa bile (veya model sıfır hız üretse bile), sıcaklık bu lineer profile yakınsayacaktır. INNATE'in öğrenmesi gereken en basit limit budur. Eğer model bu limiti bile veremiyorsa, termal fizik temelden yanlıştır.
+
+\subsection{Geçici Çözüm}
+
+Başlangıç koşulu $T(y, 0) = f(y)$ ile geçici ısı iletimi:
+\begin{equation}
+    \pd{T}{t} = \kappa \pdd{T}{y}
+\end{equation}
+Periyodik BC ile Fourier serisi çözümü:
+\begin{equation}
+    T(y, t) = T_{\text{base}}(y) + \sum_{n=1}^{\infty} B_n \exp\!\left( -\kappa \, k_n^2 \, t \right) \sin(k_n y)
+    \label{eq:transient_heat}
+\end{equation}
+burada $k_n = 2\pi n / L_y$ ve $B_n$ başlangıç koşulundan belirlenir. Her mod üstel olarak söner; yüksek modlar ($k_n$ büyük) çok daha hızlı söner. Karakteristik sönüm süresi:
+\begin{equation}
+    \tau_n = \frac{1}{\kappa \, k_n^2} = \frac{L_y^2}{4\pi^2 n^2 \kappa}
+\end{equation}
+En yavaş sönen mod ($n=1$): $\tau_1 = L_y^2/(4\pi^2 \kappa)$.
+
+
+%% ============================================================
+\section{Stokes Akışı ($\Rey \to 0$ Limiti)}
+\label{sec:stokes}
+
+\subsection{Problem}
+
+$\Rey$ çok küçükse nonlineer adveksiyon terimi ihmal edilebilir. Kararlı halde:
+\begin{equation}
+    0 = -\gradient p + \nu \laplacian \vect{u} + \vect{F}
+    \label{eq:stokes}
+\end{equation}
+
+\subsection{Kolmogorov Forcing ile Çözüm}
+
+$\vect{F} = A \sin(\tilde{k}_f y) \, \hat{\vect{e}}_x$ ile Stokes denklemi (\ref{eq:stokes}), Kolmogorov laminer çözümü (\ref{eq:kolmogorov_solution}) ile aynıdır:
+\begin{equation}
+    u(y) = \frac{A}{\nu \tilde{k}_f^2} \sin(\tilde{k}_f y), \qquad v = w = 0, \qquad p = \text{sabit}
+\end{equation}
+
+Bu, $\Rey \to 0$ limitinin tam çözümüdür. Boyutsuz birimde ($\nu = 1/\Rey$):
+\begin{equation}
+    u(y) = \frac{A \, \Rey}{\tilde{k}_f^2} \sin(\tilde{k}_f y)
+\end{equation}
+
+\textbf{INNATE için anlamı:} Eğer modele $\Rey \to 0$ (veya $\Rey = 1$) verilir ve $u(y) \propto \sin(k_f y)$, $v = w = 0$ üretirse, model difüzyon ve forcing dengesini doğru kurmuş demektir. Bu, en basit fiziksel doğrulama testidir.
+
+
+%% ============================================================
+\section{Enerji Dengesi (Analitik)}
+\label{sec:energy_balance_analytic}
+
+\subsection{Kinetik Enerji Denkleminin Türetilmesi}
+
+Momentum denklemini $\vect{u}$ ile noktasal çarpalım:
+\begin{equation}
+    \vect{u} \cdot \pd{\vect{u}}{t} = \vect{u} \cdot \left[ -(\vect{u} \cdot \gradient)\vect{u} - \gradient p + \nu \laplacian \vect{u} + \Rich T' \hat{\vect{e}}_y + \vect{F} \right]
+\end{equation}
+
+Sol taraf:
+\begin{equation}
+    \vect{u} \cdot \pd{\vect{u}}{t} = \pd{}{t} \left( \frac{|\vect{u}|^2}{2} \right) = \pd{E_{\text{lokal}}}{t}
+\end{equation}
+
+Sağ taraftaki her terim (hacim ortalaması alındığında):
+
+\begin{enumerate}
+    \item \textbf{Adveksiyon:} $\langle \vect{u} \cdot [(\vect{u} \cdot \gradient)\vect{u}] \rangle = 0$ (periyodik BC ile). Türetme:
+    \begin{equation}
+        u_j \pd{u_i}{x_j} u_i = u_j \pd{}{x_j}\!\left(\frac{u_i u_i}{2}\right)  = \pd{}{x_j}\!\left(u_j \frac{|\vect{u}|^2}{2}\right) - \frac{|\vect{u}|^2}{2} \underbrace{\pd{u_j}{x_j}}_{=\,0}
+    \end{equation}
+    İlk terim tam divergence, periyodik BC ile integralı sıfır. Sonuc: adveksiyon enerji üretmez/yok etmez.
+
+    \item \textbf{Basınç:} $\langle \vect{u} \cdot \gradient p \rangle = \langle \divergence(p\vect{u}) \rangle - \langle p \, \divergence\vect{u} \rangle = 0$ (ilk terim periyodik BC, ikinci terim sıkıştırılamazlık). Basınç da enerji üretmez/yok etmez.
+
+    \item \textbf{Difüzyon:} $\langle \vect{u} \cdot \nu \laplacian \vect{u} \rangle$. Kısmi integral:
+    \begin{equation}
+        \langle u_i \nu \partial_{jj} u_i \rangle = \nu \left[ \langle \partial_j(u_i \partial_j u_i) \rangle - \langle (\partial_j u_i)^2 \rangle \right] = -\nu \langle |\gradient \vect{u}|^2 \rangle = -2\nu Z
+    \end{equation}
+    Burada $Z = \frac{1}{2} \langle |\vect{\omega}|^2 \rangle = \frac{1}{2} \langle |\gradient \vect{u}|^2 \rangle$ enstrophy (periyodik BC'de). Dissipasyon her zaman negatiftir ($-2\nu Z \leq 0$): enerji yok eder.
+
+    \item \textbf{Buoyancy:} $\langle \vect{u} \cdot \Rich T' \hat{\vect{e}}_y \rangle = \Rich \langle v \, T' \rangle = P_{\text{buoyancy}}$.
+
+    \item \textbf{Forcing:} $\langle \vect{u} \cdot \vect{F} \rangle = P_{\text{forcing}}$.
+\end{enumerate}
+
+Toplam:
+\begin{equation}
+    \boxed{\frac{dE}{dt} = -2\nu Z + P_{\text{forcing}} + P_{\text{buoyancy}}}
+    \label{eq:energy_balance_full}
+\end{equation}
+
+\subsection{Laminer Kolmogorov İçin Analitik Değerler}
+
+Laminer çözüm $u(y) = A/(\nu \tilde{k}_f^2) \sin(\tilde{k}_f y)$ için:
+
+\begin{align}
+    E &= \frac{1}{2} \langle u^2 \rangle = \frac{1}{2} \frac{A^2}{\nu^2 \tilde{k}_f^4} \langle \sin^2(\tilde{k}_f y) \rangle = \frac{A^2}{4 \nu^2 \tilde{k}_f^4} \\[8pt]
+    P_{\text{forcing}} &= \langle u \cdot F_x \rangle = \frac{A}{\nu \tilde{k}_f^2} \cdot A \langle \sin^2(\tilde{k}_f y) \rangle = \frac{A^2}{2\nu \tilde{k}_f^2} \\[8pt]
+    Z &= \frac{1}{2} \langle \omega_z^2 \rangle = \frac{1}{2} \langle (du/dy)^2 \rangle = \frac{1}{2} \frac{A^2}{\nu^2 \tilde{k}_f^2} \langle \cos^2(\tilde{k}_f y) \rangle = \frac{A^2}{4\nu^2 \tilde{k}_f^2}
+\end{align}
+($\langle \sin^2 \rangle = \langle \cos^2 \rangle = 1/2$ periyodik ortalamada.)
+
+Doğrulama ($dE/dt = 0$):
+\begin{equation}
+    -2\nu Z + P_{\text{forcing}} = -2\nu \cdot \frac{A^2}{4\nu^2 \tilde{k}_f^2} + \frac{A^2}{2\nu \tilde{k}_f^2} = -\frac{A^2}{2\nu \tilde{k}_f^2} + \frac{A^2}{2\nu \tilde{k}_f^2} = 0 \; \checkmark
+\end{equation}
+
+\subsection{Türbülant Rejim: Ölçeklenme}
+
+Türbülant dengede $dE/dt = 0$ hala geçerlidir, ancak artık $Z$ ve $P$ analitik olarak hesaplanamaz. Ölçeklenme ilişkileri:
+\begin{itemize}
+    \item Dissipasyon hızı: $\varepsilon = 2\nu Z \sim$ $\Rey$'den bağımsız (yüksek $\Rey$'te).
+    \item Enstrophy: $Z \sim 1/(2\nu) \cdot \varepsilon \propto \Rey$ olarak artar.
+    \item Forcing gücü: $P \sim A \cdot U_{\text{rms}} / 2$ ($U_{\text{rms}}$ türbülant hız).
+\end{itemize}
+
+Bu ölçeklenme ilişkileri, $\varepsilon$ tahmininde (denklem~\ref{eq:dissipation_estimate}) kullanılmıştır.
+
+
+%% ============================================================
+\section{Özet: Analitik Referans Değerler}
+\label{sec:analitik_ozet}
+
+\begin{table}[H]
+\centering
+\caption{INNATE doğrulamasında kullanılabilecek analitik referanslar.}
+\label{tab:analitik_referans}
+\begin{tabular}{lll}
+\toprule
+\textbf{Test} & \textbf{Koşul} & \textbf{Beklenen} \\
+\midrule
+Stokes limiti      & $\Rey \to 0$ veya $\Rey = 1$ & $u(y) = A\Rey/\tilde{k}_f^2 \cdot \sin(\tilde{k}_f y)$, $v = w = 0$ \\
+Termal denge       & $t \to \infty$, $\vect{u} = 0$ & $T(y) = T_h - (\Delta T/L_y) y$ \\
+Enerji dengesi     & kararlı hal               & $2\nu Z = P_{\text{forcing}} + P_{\text{buoyancy}}$ \\
+RB instabilite     & $\Ray > 657.5$ (free-free)    & Konveksiyon başlar \\
+$\Nus$ alt sınır & her zaman & $\Nus \geq 1$ \\
+\bottomrule
+\end{tabular}
+\end{table}

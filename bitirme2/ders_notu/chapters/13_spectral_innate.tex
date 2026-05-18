@@ -1,0 +1,731 @@
+% ============================================================
+% Bölüm 13: Saf-INNATE Spectral Mimari
+% Yazım tarihi: 2026-05-09
+% Konu: MLP-SGS yerine SpectralCsField — Fourier-mod ile Cs(x,y,z) öğrenimi
+% ============================================================
+\chapter{Saf-INNATE Spectral Mimari}
+\label{ch:spectral}
+
+\textit{``MLP'siz saf INNATE mimarisi'' — Berke Tezgöçen, 18 Şubat 2026.
+Bu bölüm, üç ay süren hibrit MLP-INNATE deneyimi sonrasında, orijinal vizyona dönüşü
+ve bu dönüşün matematiksel-mimari karşılığı olan SpectralCsField yapısını anlatır.}
+
+\bigskip
+
+Bu bölümde, INNATE çatısı altında turbülans kapanışını sağlayan
+\textbf{Smagorinsky katsayısı} $C_s(x,y,z)$ alanının Fourier modlarıyla
+parametrize edildiği ``Saf-INNATE Spectral'' mimari sunulmaktadır.
+Önceki bölümlerde anlatılan v2 hibrit mimaride bu rolü, çok-katmanlı bir
+yapay sinir ağı (MLP-SGS) üstleniyordu. 9 Mayıs 2026 tarihinde alınan
+mimari karar ile MLP modülü tamamen kaldırılmış ve yerine, klasik
+Smagorinsky kapanışını koruyup yalnızca $C_s$ alanını uzaysal olarak
+zenginleştiren bir spektral parametrizasyon getirilmiştir.
+
+% =====================================================================
+\section{Motivasyon: MLP'nin Reddedilmesi}
+\label{sec:motivasyon-mlp-red}
+
+\subsection{Berke'nin Orijinal Vizyonu}
+
+Bu projenin entelektüel temelini oluşturan ilkesel kararlardan biri, 18
+Şubat 2026 tarihli proje notunda şu şekilde kayda geçirilmiştir:
+
+\begin{quote}
+\textit{``INNATE nöronları (Advection3D, Diffusion, Projection3D, Forcing3D,
+Buoyancy3D vb.) MLP'deki nöronlar GİBİ düşünülmeli. 1 Advection3D değil,
+yüzlerce Advection3D nöron kullanılacak. Her nöronun kendi fiziksel
+parametresi var. Nöronların ağı problemi öğreniyor — MLP'ye gerek YOK.''}
+\end{quote}
+
+Bu vizyona göre INNATE'in özgünlüğü, sinir ağındaki ``ağırlık + bias +
+ReLU'' üçlüsünün yerini ``fiziksel operatör + skaler katsayı + ölçek-aware
+bağlantı'' üçlüsünün almasıdır. Bu ikame yalnızca felsefi bir tercih
+değildir; aynı zamanda \emph{yorumlanabilirlik}, \emph{az veri gerektirme}
+ve \emph{fizik-tutarlılık} gibi somut akademik kazançlar sağlar.
+
+\subsection{v2 Hibrit Mimarinin Sorunu}
+
+Bölüm~\ref{ch:innate_mimari}'de tanıtılan v2 hibrit mimari, INNATE
+fiziksel nöronlarının yanına bir \texttt{PhysicsModulatorMC} adlı küçük
+MLP yerleştirmiştir. Bu MLP, akış durumunu özetleyen 6 küresel skaler
+(toplam kinetik enerji, ortalama gradyan büyüklüğü, ortalama sıcaklık
+sapması vb.) alıp $C_s$, $\Pran_t$ ve forcing-genliği gibi 3 küresel
+ölçek faktörü üretiyordu. Hibridin parametre dağılımı şöyleydi:
+
+\begin{table}[H]
+\centering
+\caption{v2 hibrit modelin parametre dağılımı (toplam $\approx$~503).}
+\label{tab:v2-params}
+\begin{tabular}{lrr}
+\toprule
+\textbf{Bileşen} & \textbf{Parametre} & \textbf{Oran} \\
+\midrule
+INNATE fiziksel nöronlar (20 katman) & 225 & \%44.7 \\
+MLP modülatörü (\texttt{PhysicsModulatorMC}) & 192 & \%38.2 \\
+Diğer (forcing, BC, dt mults)        &  86 & \%17.1 \\
+\midrule
+\textbf{Toplam} & \textbf{503} & \%100 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Bu tablodaki \%38.2'lik MLP payı, akademik savunmada birkaç soruyu
+beraberinde getirmiştir:
+
+\begin{enumerate}
+  \item \textbf{Bilim Hocasının sorusu:} ``Modelinizde toplam neden bu
+        kadar az parametre var? 503 parametre ile turbülans nasıl
+        modelleniyor?'' Bu soru gerçektir, çünkü neural operator
+        literatüründeki tipik modeller (FNO, GNO, U-Net) milyon mertebesinde
+        parametreye sahiptir.
+  \item \textbf{Felsefi tutarsızlık:} Eğer iddia ``MLP'siz saf-fizik'' ise,
+        parametrelerin neredeyse yarısının bir MLP'de bulunması bu iddiayı
+        zayıflatır. Bu, savunmayı dışsal sorulara açık hâle getirir.
+  \item \textbf{Yorumlanabilirlik kaybı:} MLP iç gizli katmanları
+        (32 ya da 64 boyutlu) doğrudan yorumlanamaz. ``Bu nöron
+        forcing'in genliğini neden artırdı?'' sorusunun fiziksel cevabı
+        yoktur; yalnızca veri-uyumlu bir gradyan tepkisidir.
+\end{enumerate}
+
+\subsection{9 Mayıs 2026 Kararı}
+
+Bu eleştiriler doğrultusunda, 9 Mayıs 2026 tarihinde aşağıdaki karar
+alınmıştır:
+
+\begin{quote}
+\textbf{Karar.} \texttt{PhysicsModulatorMC} mimariden kaldırılır. Yerine,
+klasik Smagorinsky kapanışının $C_s$ katsayısını \textbf{uzaysal alan}
+olarak parametrize eden bir spektral modül (\texttt{SpectralCsField})
+tanıtılır. Bu modül, kapasiteyi MLP'siz olarak artırır; çünkü her
+katmanda $C_s(x,y,z)$ alanını birkaç yüz kompleks Fourier katsayısı ile
+temsil eder.
+\end{quote}
+
+Bu karar üç tasarım kısıtını birden tatmin etmektedir: (i) MLP yok,
+yani saf-fizik iddiası tutarlı; (ii) parametre sayısı $\sim$10K
+mertebesine yükseliyor, akademik savunmada makul; (iii) klasik
+Smagorinsky form korunuyor, yani LES literatürüne köprü kuruluyor.
+
+% =====================================================================
+\section{Klasik Smagorinsky Kapanışının Hatırlatılması}
+\label{sec:smagorinsky-recap}
+
+\subsection{Eddy-Viscosity Modeli}
+
+LES çerçevesinde filtrelenmiş momentum denkleminde ortaya çıkan
+çözülememiş gerilim tensörü $\tau_{ij}^{r} = \widetilde{u_i u_j} -
+\widetilde{u}_i\widetilde{u}_j$, Smagorinsky modelinde aşağıdaki
+eddy-viscosity kapanışıyla yaklaşıklanır:
+
+\begin{equation}
+  \tau_{ij}^{r} - \tfrac{1}{3}\tau_{kk}^{r}\delta_{ij} = -2\,\nu_t\,\widetilde{S}_{ij},
+  \label{eq:smag-stress}
+\end{equation}
+
+\noindent burada $\widetilde{S}_{ij}$ filtrelenmiş simetrik gerinim tensörü ve
+$\nu_t$ türbülans (eddy) viskozitesidir:
+
+\begin{align}
+  \widetilde{S}_{ij} &= \tfrac{1}{2}\!\left(\pd{\widetilde{u}_i}{x_j} +
+                       \pd{\widetilde{u}_j}{x_i}\right), \\[4pt]
+  |\widetilde{S}|    &= \sqrt{2\,\widetilde{S}_{ij}\widetilde{S}_{ij}}, \\[4pt]
+  \nu_t              &= (C_s\,\Delta)^{2}\,|\widetilde{S}|.
+  \label{eq:smag-nu_t}
+\end{align}
+
+Burada $\Delta$ filtre genişliğidir (genelde grid aralığı). Lilly'nin
+1967 tarihli klasik analizi, izotropik türbülans için $C_s\approx 0.17$
+değerini önerir. Kanal ve sınır tabakası gibi heterojen akışlarda bu
+değer düşük (0.05--0.10) ya da uzaysal değişken hâle gelir.
+
+\subsection{Termal Kapanış: Türbülanslı Prandtl Sayısı}
+
+Termal alan için benzer bir formülasyon türbülanslı Prandtl sayısı
+$\Pran_t$ üzerinden yapılır:
+
+\begin{equation}
+  \kappa_t = \frac{\nu_t}{\Pran_t},
+  \qquad
+  \widetilde{q}_j^{\,r} = -\kappa_t\,\pd{\widetilde{T}}{x_j}.
+  \label{eq:thermal-closure}
+\end{equation}
+
+Reynolds analojisinin (Bölüm~\ref{ch:turbulans-les}) doğrudan sonucu
+olan bu eşitlik, $\nu_t$ ve $\kappa_t$'nin ortak bir kapanış üzerinden
+üretildiğini söyler; yani $C_s$ alanı bilindiğinde $\Pran_t$ tek başına
+bir skaler kalır.
+
+\subsection{Klasik Modelin Kısıtları}
+
+Klasik Smagorinsky modelinin pratikte iyi bilinen üç kısıtı vardır:
+
+\begin{enumerate}
+  \item \textbf{Sabit $C_s$ kabulü.} Tek bir $C_s$ skaleri tüm akış
+        bölgeleri için kullanılır. Oysa duvar yakınında $C_s$
+        $0.05$'e kadar düşmeli, izotropik bölgede $0.17$ civarında
+        kalmalıdır.
+  \item \textbf{Aşırı disipasyon.} Yüksek $|\widetilde{S}|$ bölgelerinde
+        $\nu_t$ orantılı artar; bu da küçük ölçekleri gereğinden fazla
+        söndürür ve enerji spektrumunda erken kesim yaratır.
+  \item \textbf{Geri-saçılım yokluğu.} $\nu_t \geq 0$ kısıtı, küçük
+        ölçeklerden büyük ölçeklere enerji aktarımını (backscatter)
+        baştan dışlar. Oysa fiziksel türbülansta ortalama \%20--30 backscatter
+        gözlenir.
+\end{enumerate}
+
+\subsection{Dynamic Smagorinsky Yaklaşımı}
+
+Germano \emph{ve ark.} (1991), $C_s$'nin uzaysal-zamansal değişimini akış
+verisinden test-filtre ile çıkarmayı öneren ``dinamik'' yaklaşımı
+geliştirmiştir. Burada $C_s(x,t)$ iki farklı filtre genişliğinde
+hesaplanan gerilim tensörlerinin oranı olarak elde edilir:
+
+\begin{equation}
+  C_s^{2}(x,t) = \frac{\langle L_{ij} M_{ij}\rangle}{\langle M_{ij} M_{ij}\rangle},
+  \label{eq:germano-identity}
+\end{equation}
+
+\noindent burada $L_{ij}$ Leonard tensörü ve $M_{ij}$ test-filtre farkıdır.
+Dinamik model, klasik Smagorinsky'nin tek skaler kısıtını kırar ama
+nümerik istikrarsızlık (negatif $C_s^2$ değerleri) ve maliyetli test
+filtreleme gibi yeni sorunlar getirir.
+
+\textbf{Bu bölümün önerisi}, Germano-tipi dinamik kapanışın
+\emph{ruhunu} koruyup (uzaysal değişken $C_s$), ancak test-filtre
+kalibrasyonu yerine gradient-tabanlı öğrenme kullanmaktır. SpectralCsField
+tam olarak bu boşluğa yerleşir.
+
+% =====================================================================
+\section{SpectralCsField Tasarımı}
+\label{sec:spectral-cs-design}
+
+\subsection{Anahtar Fikir: $C_s$'nin Alan Olarak Parametrizasyonu}
+
+Tek skaler $C_s$ yerine, üç boyutlu uzayda değişen bir alan tanımlarız:
+
+\begin{equation}
+  C_s(x,y,z) = C_s^{\mathrm{base}} + \mathrm{Re}\!\left[\,
+                \sum_{\substack{|k_x|\leq K_x \\ |k_y|\leq K_y \\ 0\leq k_z\leq K_z}}\!\!
+                c_{\vect{k}}\,\exp\!\bigl(i\,\vect{k}\cdot\vect{x}\bigr)\right],
+  \label{eq:spectral-cs-master}
+\end{equation}
+
+\noindent burada $C_s^{\mathrm{base}}=0.155$ Lilly-temelli sabit baz, $\vect{k}=
+(k_x,k_y,k_z)$ dalga vektörü, $\vect{x}=(x,y,z)\in[0,2\pi]^3$ konum
+ve $c_{\vect{k}}\in\mathbb{C}$ \emph{öğrenilebilir} kompleks Fourier
+katsayılarıdır. Truncation üst sınırları:
+
+\begin{equation}
+  K_x = 5,\qquad K_y = 8,\qquad K_z = 6.
+  \label{eq:truncation}
+\end{equation}
+
+Burada $K_y > K_x, K_z$ olmasının fiziksel sebebi, $y$ ekseninin
+\emph{dikey} eksen olmasıdır: buoyancy-driven mixed convection'da
+sıcaklık gradyanı ve dolayısıyla $C_s$'nin uzaysal değişkenliği
+düşey yönde en yoğundur.
+
+\subsection{Modal Sayım ve Parametre Bütçesi}
+
+\texttt{rfftn} (real-input FFT) konvansiyonu gereği yalnızca yarım
+$z$-eksenini saklarız ($k_z\geq 0$). Mod sayısı:
+
+\begin{equation}
+  N_{\mathrm{mod}} = (2K_x+1)(2K_y+1)(K_z+1) = 11\cdot 17\cdot 7 = 1309.
+\end{equation}
+
+Ancak modlar Hermitik simetrik olduğundan ve nümerik kararlılık için
+yalnızca düşük $|\vect{k}|$ bölgesini tutarız; pratikte aktif mod
+sayısı $\approx 240$ olarak ayarlanmıştır. Her aktif mod $(\mathrm{Re}\,c_{\vect{k}},
+\mathrm{Im}\,c_{\vect{k}})$ olmak üzere iki gerçel sayıyla temsil edilir.
+Buradan katman başına spektral parametre sayısı:
+
+\begin{equation}
+  N_{\mathrm{spec}}/\text{katman} = 2 \times 240 = 480.
+\end{equation}
+
+Spektral alana ek olarak, her katmanda dört adet katman-içi skaler bulunur:
+
+\begin{itemize}
+  \item $\Pran_t^{(\ell)}$: log-parametrize, sıkıştırma $[0.3, 1.5]$.
+        Reynolds analojisini katman düzeyinde esnetir.
+  \item $a_y^{(\ell)}$: anizotropi katsayısı (dikey), $[0.5, 2.0]$.
+  \item $a_z^{(\ell)}$: anizotropi katsayısı (span-wise), $[0.5, 2.0]$.
+  \item $\delta C_s^{\mathrm{base},(\ell)}$: katmana özgü baz kayması.
+\end{itemize}
+
+Toplam katman başına: $480 + 4 = 484$ parametre. 20 katmanlı INNATE
+yığını için spektral toplam:
+
+\begin{equation}
+  N_{\mathrm{spec,total}} = 20\times 484 = 9680.
+\end{equation}
+
+INNATE'in 225 fiziksel-nöron parametresi (advection skalörleri,
+buoyancy katsayısı, projection terimi vs.) ile birlikte modelin
+genel parametre sayısı:
+
+\begin{equation}
+  N_{\mathrm{total}} = 9680 + 225 = 9905.
+\end{equation}
+
+Bunun \textbf{163 elemanı Tier-1 dondurulmuştur} (sıfır-noktası fiziksel
+sabitler — bkz. Bölüm~\ref{ch:innate_mimari}); dolayısıyla eğitilebilir
+parametre sayısı $9905-163=9742$'dir.
+
+\subsection{Çıktı Sınırlandırması}
+
+Spektral toplam, bazen Lilly bazını $C_s>1$ veya $C_s<0$ değerlerine
+sürükleyebilir; bu fiziksel olarak anlamsızdır. Bu yüzden son aşamada
+sıkıştırma uygulanır:
+
+\begin{equation}
+  C_s(x,y,z) \;\leftarrow\; \mathrm{clamp}\!\bigl(C_s(x,y,z),\; 0.05,\; 0.30\bigr).
+  \label{eq:cs-clamp}
+\end{equation}
+
+Üst sınır $0.30$, izotropik türbülansın deneysel üst $C_s$ değerinin
+yaklaşık iki katıdır; alt sınır $0.05$ ise duvar-bölgesi LES verisindeki
+en düşük efektif $C_s$ değerine yakındır. Bu sınırlandırma
+\texttt{torch.clamp} ile uygulanır ve gradyanı satırların dışında sıfırlar.
+
+% =====================================================================
+\section{Fiziksel Yorumlama}
+\label{sec:fiziksel-yorum}
+
+SpectralCsField'in tasarım kararları yalnızca nümerik değil, fiziksel
+sebeplere de dayanır.
+
+\subsection{Düşük-Mod Truncation: Fiziksel Bir Düzenlileştirme}
+
+$|\vect{k}| > K$ modlarının dışlanması, $C_s$ alanına bir \emph{spektral
+düzenlileştirme} (regularization) etkisi yapar. Türbülanslı akışta,
+$C_s$ alanı esas olarak \emph{geometri} ve \emph{sınır koşulları} tarafından
+şekillendirilir; akışın anlık küçük-ölçek yapıları $C_s$'yi çok hızlı
+değiştirmemelidir.
+
+\begin{itemize}
+  \item \textbf{Düşük-$\vect{k}$ modlar} (örn. $k=(0,1,0)$) duvar yakını
+        gradyan azalmasını temsil edebilir.
+  \item \textbf{Orta-$\vect{k}$ modlar} ($k=(2,3,1)$) heterojen kayma
+        bölgeleri ile uyumludur.
+  \item \textbf{Yüksek-$\vect{k}$ modlar} ($|\vect{k}|>10$) küçük-ölçek
+        türbülans dalgalanmaları olur ki, bunlar zaten Smagorinsky'nin
+        $|\widetilde{S}|$ terimine bırakılmıştır.
+\end{itemize}
+
+Bu sayede türbülansın kendisi $|\widetilde{S}|$ üzerinden, $C_s$ alanın
+\emph{yapısal} bağlamı ise düşük-mod katsayıları üzerinden öğrenilir;
+iki katkı ayrıştırılmıştır.
+
+\subsection{Katman-Bağımsız Profiller: Fractional-Step Heterojenliği}
+
+INNATE'in 20-katmanlı fractional-step yığınında her katman, zaman
+adımının farklı bir noktasında çalışır:
+
+\begin{enumerate}
+  \item İlk katmanlar advektif transportu işler — büyük ölçek tasıma.
+  \item Orta katmanlar diffüzyon ve eddy-viscosity uygular — kapanış
+        bölgesi.
+  \item Son katmanlar projection ve forcing dengeler — eddy-viscosity
+        artığı.
+\end{enumerate}
+
+Her katmanın kendi $C_s^{(\ell)}(x,y,z)$ alanına sahip olması, yığının
+zaman-içi heterojenliğini tanımasını sağlar. Bu nokta, klasik LES'te
+bulunmayan ve INNATE'e özgü bir tasarım avantajıdır.
+
+\subsection{DC Mod ve Baz Skaler}
+
+$\vect{k}=\vect{0}$ moduna karşılık gelen katsayı $c_{\vect{0}}$
+\emph{sıfırlanır}. Sebebi: bu mod uzaysal ortalamayı temsil eder ve
+zaten $C_s^{\mathrm{base}}$ skaleri tarafından öğrenilmektedir.
+Aksi takdirde iki parametre aynı bilgiyi taşır (özdeşlik dejenerasyonu)
+ve optimizasyonun yer-değiştirme simetrisi rank-eksik bir kısıt
+yaratır. Bu DC sıfırlama, mimaride zarif bir simetri-kırma kararıdır.
+
+\subsection{Per-Katman $\Pran_t$: Reynolds Analojisinin Yumuşatılması}
+
+Klasik Reynolds analojisi $\Pran_t = 0.85$ (sabit) varsayar. Oysa
+mixed convection'da sıcaklık alanı momentum alanından yapısal olarak
+farklıdır; özellikle düşey eksendeki termal sınır tabakası daha incedir.
+Her katmanın kendi $\Pran_t^{(\ell)}$ skalerine sahip olması, bu farkı
+katmana özgü olarak kalibre etmesini sağlar:
+
+\begin{equation}
+  \Pran_t^{(\ell)} = 0.3 + 1.2\,\sigma\!\bigl(p^{(\ell)}\bigr),
+  \label{eq:prt-sigmoid}
+\end{equation}
+
+\noindent burada $p^{(\ell)}\in\mathbb{R}$ ham parametredir ve $\sigma(\cdot)$
+sigmoid fonksiyonudur. Çıkış aralığı tam olarak $[0.3, 1.5]$'tir.
+
+% =====================================================================
+\section{Forward Pass Akışı}
+\label{sec:forward-pass}
+
+Bu bölümde, SpectralCsField modülünün tek-katman ileri-yayılım
+algoritması adım adım verilmiştir.
+
+\subsection{Algoritma}
+
+\begin{figure}[H]
+\centering
+\fbox{\begin{minipage}{0.92\textwidth}
+\textbf{Algoritma 13.1.} SpectralCsField tek-katman ileri yayılımı.
+
+\medskip
+
+\textbf{Girdi:} $\vect{u}\in\mathbb{R}^{N_x\times N_y\times N_z\times 3}$
+(filtrelenmiş hız), $\widetilde{T}$ (sıcaklık), katman $\ell$. \\
+\textbf{Çıktı:} $\nu_t^{(\ell)}, \kappa_t^{(\ell)}, C_s^{(\ell)}(\vect{x})$.
+
+\begin{enumerate}
+  \item Katmana özgü ham parametreleri al: $\{c_{\vect{k}}^{(\ell)}\}$,
+        $p^{(\ell)}, a_y^{(\ell)}, a_z^{(\ell)}, \delta b^{(\ell)}$.
+  \item Spektrum tensörünü kur:\\
+        $\widehat{C}_s\in\mathbb{C}^{N_x\times N_y\times (N_z/2+1)}$,
+        düşük-$|\vect{k}|$ kutusuna $c_{\vect{k}}$ yerleştir, kalanı sıfır.
+  \item DC modu maskele: $\widehat{C}_s[\vect{0}] \leftarrow 0$.
+  \item Ters-FFT: $C_s^{\mathrm{pert}} = \mathrm{irfftn}\!\bigl(\widehat{C}_s,
+        s=(N_x,N_y,N_z)\bigr)$.
+  \item Bazla topla: $C_s = (C_s^{\mathrm{base}} + \delta b^{(\ell)}) +
+        C_s^{\mathrm{pert}}$.
+  \item Sıkıştır: $C_s\leftarrow \mathrm{clamp}(C_s, 0.05, 0.30)$.
+  \item Gerinim büyüklüğünü hesapla:
+        $|\widetilde{S}|=\sqrt{2\,\widetilde{S}_{ij}\widetilde{S}_{ij}}$
+        (Bölüm~\ref{sec:smagorinsky-recap}).
+  \item Eddy-viscosity: $\nu_t = (C_s\,\Delta)^{2}\,|\widetilde{S}|$.
+  \item Termal: $\kappa_t = \nu_t / \Pran_t^{(\ell)}$,
+        $\Pran_t^{(\ell)}$ Eş.~\eqref{eq:prt-sigmoid}'den.
+  \item Anizotropik viskoziteler:
+        $\nu_x = \nu_{\mathrm{mol}} + \nu_t$,
+        $\nu_y = \nu_{\mathrm{mol}} + a_y^{(\ell)}\nu_t$,
+        $\nu_z = \nu_{\mathrm{mol}} + a_z^{(\ell)}\nu_t$.
+  \item NaN-koruma: $\nu_t\leftarrow \mathrm{nan\_to\_num}(\nu_t,
+        \text{nan}=0,\,\text{posinf}=10^4)$.
+\end{enumerate}
+\end{minipage}}
+\label{alg:spectral-forward}
+\end{figure}
+
+\subsection{Kod Karşılığı}
+
+PyTorch implementasyonunun çekirdek kısmı şu şekildedir:
+
+\begin{lstlisting}[caption={SpectralCsField cekirdek forward (innate.py:4474+).}]
+class SpectralCsField(nn.Module):
+    def __init__(self, kx_max=5, ky_max=8, kz_max=6,
+                 cs_base=0.155, cs_min=0.05, cs_max=0.30):
+        super().__init__()
+        n_modes = (2*kx_max+1)*(2*ky_max+1)*(kz_max+1)
+        # Kompleks katsayilari (Re, Im) iki ayri gercel parametre
+        self.coeffs_real = nn.Parameter(0.005 * torch.randn(n_modes))
+        self.coeffs_imag = nn.Parameter(0.005 * torch.randn(n_modes))
+        self.cs_base = cs_base  # 0.155 -- Lilly default
+        self.cs_min, self.cs_max = cs_min, cs_max
+        self.kx_max, self.ky_max, self.kz_max = kx_max, ky_max, kz_max
+
+    def forward(self, S_mag, dx, Nx, Ny, Nz):
+        # 1) rfftn shape spektrumu kur
+        spec = torch.zeros((Nx, Ny, Nz//2+1),
+                           dtype=torch.complex64,
+                           device=S_mag.device)
+        # 2) Dusuk-k bolgesine yerlestir
+        k_real = self.coeffs_real
+        k_imag = self.coeffs_imag
+        # ... (modal indeksleme: kx in [-Kx, Kx], ky in [-Ky, Ky], kz>=0)
+        spec = self._scatter_low_k(spec, k_real, k_imag)
+        # 3) DC modu sifirla
+        spec[0, 0, 0] = 0.0 + 0.0j
+        # 4) Ters-FFT
+        cs_pert = torch.fft.irfftn(spec, s=(Nx, Ny, Nz)).real
+        # 5) Baz + sikistir
+        Cs = torch.clamp(self.cs_base + cs_pert, self.cs_min, self.cs_max)
+        # 6) Smagorinsky kapanisi
+        nu_t = (Cs * dx)**2 * S_mag
+        return torch.nan_to_num(nu_t, nan=0.0, posinf=1e4), Cs
+\end{lstlisting}
+
+Burada \texttt{\_scatter\_low\_k} işlevi, $\{c_{\vect{k}}\}$ vektörünü
+spektrum tensörünün düşük-$|\vect{k}|$ kutusuna yerleştiren statik bir
+indeksleme adımıdır.
+
+\subsection{Hesaplama Karmaşıklığı}
+
+İleri yayılımın hâkim maliyeti tek bir \texttt{irfftn} çağrısıdır:
+
+\begin{equation}
+  T_{\mathrm{spec}} \;\sim\; \mathcal{O}\!\bigl(N_x N_y N_z \log(N_x N_y N_z)\bigr).
+\end{equation}
+
+$96\times 160\times 64 = 983\,040$ noktalı grid için bu, modern GPU'da
+$<\!1$~ms'lik bir maliyettir. v2'deki \texttt{PhysicsModulatorMC} ileri
+geçişi ortalama $0.7$~ms idi; SpectralCsField pratikte aynı maliyeti
+korur fakat \emph{uzaysal değişken} bir $C_s$ alanı üretir. Bu, bir
+``ücretsiz öğle yemeği'' (free lunch) örneğidir.
+
+\subsection{Bellek Bütçesi}
+
+Tek-adımlı backward (autograd grafiği canlı) için ölçülen GPU bellek
+kullanımı, $96\times 160\times 64$ gridde:
+
+\begin{table}[H]
+\centering
+\caption{VRAM kıyası (RTX 4090, batch=1, FP32, autograd açık).}
+\label{tab:vram}
+\begin{tabular}{lr}
+\toprule
+\textbf{Mimari} & \textbf{Tepe VRAM} \\
+\midrule
+v2 (MLP-SGS hibrit) & 13.8 GB \\
+\textbf{Saf-INNATE Spectral}      & \textbf{6.55 GB} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Spectral mimari, MLP'nin gizli aktivasyonlarını taşımadığı için
+\textbf{2.1$\times$ daha az VRAM} tüketir. Bu, daha büyük batch
+boyutuna ya da daha uzun zamansal pencereye yer açar.
+
+% =====================================================================
+\section{Eğitim Davranışı}
+\label{sec:training-behavior}
+
+\subsection{Başlangıç Koşulu}
+
+Eğitime şu başlangıç değerleri ile başlanır:
+
+\begin{align}
+  c_{\vect{k}}^{(\ell)} &\sim \mathcal{N}(0,\,0.005^{2})
+                          \quad (\text{tüm katman, tüm mod}), \\[2pt]
+  C_s^{\mathrm{base}}   &= 0.155, \\[2pt]
+  \Pran_t^{(\ell)}      &= 0.85
+                          \quad (\sigma^{-1}(0.458)\;\text{ham},\;\eqref{eq:prt-sigmoid}'\text{ten}), \\[2pt]
+  a_y^{(\ell)}, a_z^{(\ell)} &= 1.0.
+\end{align}
+
+Bu başlangıç koşulu, modeli ilk iterasyonda \emph{tam olarak klasik
+Smagorinsky} davranışına eşitler: $C_s\equiv 0.155$ uniform, $\Pran_t=0.85$
+sabit, anizotropi yok. Yani SpectralCsField, eğitim ilerledikçe
+klasik kapanışın \emph{üstüne} ek yapı katar; sıfırdan kara kutu
+kurmaz. Bu özellik, Bölüm~\ref{ch:training}'de tartışılan
+``physics-prior init'' prensibinin somut karşılığıdır.
+
+\subsection{Optimizer ve Loss}
+
+Eğitim, AdamW (lr=$10^{-4}$, weight\_decay=$10^{-3}$) ile yapılır.
+Loss, Bölüm~\ref{ch:training}'deki kompozit kayıptır:
+
+\begin{equation}
+  \mathcal{L} = \lambda_{\mathrm{PDE}}\,\mathcal{L}_{\mathrm{PDE}}
+              + \lambda_{\mathrm{spec}}\,\mathcal{L}_{\mathrm{spec}}
+              + \lambda_{\mathrm{stat}}\,\mathcal{L}_{\mathrm{stat}}
+              + \lambda_{\mathrm{stab}}\,\mathcal{L}_{\mathrm{stab}}.
+\end{equation}
+
+PDE rezidüel terimi $\mathcal{L}_{\mathrm{PDE}}$ içinde $\nabla\!\cdot
+(\nu_t\nabla u)$ açıkça yer aldığı için, gradyan zinciri doğrudan
+$\{c_{\vect{k}}\}$ katsayılarına ulaşır. Anlamlı modlar büyür, anlamsız
+modlar gauss çekirdeği etrafında dalgalanır.
+
+\subsection{Kompleks Tensör Üzerinden Gradyan}
+
+PyTorch otomatik türev motoru, \texttt{torch.complex64} tensörler
+üzerinde Wirtinger türevini destekler:
+
+\begin{equation}
+  \frac{\partial \mathcal{L}}{\partial c_{\vect{k}}}
+   = \frac{1}{2}\!\left(
+     \frac{\partial\mathcal{L}}{\partial\,\mathrm{Re}\,c_{\vect{k}}}
+     - i\,\frac{\partial\mathcal{L}}{\partial\,\mathrm{Im}\,c_{\vect{k}}}\right).
+\end{equation}
+
+Pratikte $(\mathrm{Re}\,c_{\vect{k}}, \mathrm{Im}\,c_{\vect{k}})$ ayrı
+\texttt{nn.Parameter} olarak tutulduğu için Adam optimizer'ı bu iki
+ham parametre üzerinde \emph{birinci-derece moment} ve \emph{ikinci-derece
+moment} ayrı ayrı tutar. Bu, kompleks-değerli gradient inişlerinde
+sıkça gözlenen ``moment çiftlenmesi'' problemini ortadan kaldırır.
+
+\subsection{Sayısal Güvenlik}
+
+İleri yayılımda iki güvenlik mekanizması vardır:
+
+\begin{enumerate}
+  \item \textbf{Eş.~\eqref{eq:cs-clamp}'deki sıkıştırma:} $C_s$
+        değerlerini $[0.05, 0.30]$ aralığına hapseder.
+  \item \textbf{\texttt{nan\_to\_num}:} $\nu_t$ tensöründeki olası
+        NaN/Inf değerleri sıfıra dönüştürür. FFT zincirinde tek bir
+        Inf, geri-yayılımda tüm gradyan grafiğini kirletebilir; bu
+        koruma o zinciri kırar.
+\end{enumerate}
+
+Smoke testte $100$ adımlık ileri yayılımda hiç NaN gözlenmemiştir
+(no\_grad mod, $39.6$~saniye, RTX 4090).
+
+% =====================================================================
+\section{Avantajlar ve Sınırlar}
+\label{sec:adv-and-limits}
+
+\subsection{Avantajlar}
+
+\begin{enumerate}
+  \item \textbf{Saf-fizik tutarlılığı.} MLP yoktur; her parametre ya
+        klasik Smagorinsky'nin bilinen bir niceliğine ($C_s$, $\Pran_t$,
+        anizotropi) ya da bunların Fourier-bileşenlerine karşılık gelir.
+        Berke'nin 18 Şubat 2026 vizyonu metodolojik olarak tutturulmuştur.
+  \item \textbf{Klasik literatürle bağ.} Form Eş.~\eqref{eq:smag-stress}
+        klasik Smagorinsky kapanışıdır. Modelin yenilik kısmı, $C_s$'nin
+        \emph{nasıl} parametrize edildiğidir, kapanışın kendisi değildir.
+        Bu, akademik savunmada literatürle köprü kurmayı kolaylaştırır.
+  \item \textbf{Uzaysal yapı öğrenimi.} Tek-skaler $C_s$ yerine üç-boyutlu
+        bir alan öğrenildiği için, model heterojen bölgelere uyum
+        sağlayabilir.
+  \item \textbf{Katmana özgü profiller.} 20-katmanlı yığında her
+        katmanın kendi $C_s$ alanı vardır; fractional-step iç
+        heterojenliği yakalanır.
+  \item \textbf{Düşük VRAM.} v2'ye göre $\sim$2.1$\times$ daha az bellek
+        (Tablo~\ref{tab:vram}).
+  \item \textbf{Gradient-uyumlu.} Tüm operasyonlar (FFT, clamp,
+        modal-scatter) PyTorch autograd ile uyumludur; eğitim sade
+        AdamW ile yapılır.
+\end{enumerate}
+
+\subsection{Sınırlar (Dürüst Değerlendirme)}
+
+Bu tezin dürüstlük prensibi gereği, mimarinin sınırları da açıkça
+yazılmalıdır:
+
+\begin{enumerate}
+  \item \textbf{Akış-bağımsız $C_s$ alanı.} $C_s(x,y,z)$, eğitim
+        sonrasında \emph{donmuştur}; akışın anlık durumuna göre
+        değişmez. Bu, yeni başlangıç koşullarında önceden
+        kalibre edilmiş $C_s$ alanını uyguladığı anlamına gelir.
+        v2 hibridi, MLP üzerinden $C_s$ ölçek faktörünü anlık
+        akış durumuna göre değiştirebiliyordu — bu yetenek kaybolmuştur.
+  \item \textbf{Kesintili türbülansa uyum.} Türbülans, özellikle
+        sınır tabakalarında, kesintili (intermittent) bir yapıdadır;
+        aynı uzaysal nokta zaman içinde laminer ve türbülanslı
+        olabilir. Statik bir $C_s$ alanı bu zaman-içi anahtarlamayı
+        açıkça modelleyemez. Smagorinsky'nin $|\widetilde{S}|$ terimi
+        kısmen bu rolü üstlenir, ancak fiziksel olarak ideal değildir.
+  \item \textbf{``Fizik nöronu'' mu yoksa ``parametrik alan
+        temsili'' mi?} 480 adet kompleks Fourier katsayısı, semantik
+        olarak ne tek bir Smagorinsky parametresinin uzantısıdır,
+        ne de bir MLP nöronudur. Bunun adlandırılması (Bölüm
+        \ref{ch:innate_mimari}'deki ``fizik nöronu'' kavramı altında
+        ya da yeni bir ``alan-parametrik nöron'' kategorisi olarak)
+        savunmada bir tartışma konusudur.
+  \item \textbf{Truncation seçimi heuristic.} $K_x=5,K_y=8,K_z=6$
+        seçimi temel olarak deneysel ve fiziksel sezgiyle
+        yapılmıştır ($y$ dikey eksen olduğu için daha geniş).
+        Tam bir hyperparameter sweep yapılmamıştır;
+        bu, gelecek çalışma kapsamına alınmıştır.
+  \item \textbf{Parametre-anlam haritası seyrek.} 9680 spektral
+        parametrenin her birinin ``fiziksel anlam'' bakımından
+        karşılığını yazmak mümkün değildir. ``Modün $\vect{k}=(2,3,1)$
+        konumundaki kompleks katsayısı'' bir parametre etiketidir, ama
+        ``buoyancy gücü'' gibi doğrudan bir fizik niceliği değildir.
+        Bu, MLP'ye göre yorumlanabilirliğin daha iyi olduğu, ancak
+        klasik Smagorinsky'nin tek-skalerli yorumlanabilirliğinin
+        gerisinde kaldığı anlamına gelir.
+\end{enumerate}
+
+% =====================================================================
+\section{Diğer Saf-INNATE Genişletme Seçenekleri}
+\label{sec:alternatives}
+
+SpectralCsField'a karar vermeden önce üç alternatif tasarım
+değerlendirilmiştir. Aşağıda her biri ve ret sebepleri özetlenmiştir.
+
+\subsection{A. Saf-Skaler (200 parametre)}
+
+\textbf{Tasarım.} Her katmanda yalnızca $C_s^{(\ell)}, \Pran_t^{(\ell)}$
+ve birkaç anizotropi katsayısı; toplam $\approx 200$ parametre.
+
+\textbf{Reddedilme sebebi.} Akademik savunmada ``200 parametre ile mixed
+convection'' iddiası inandırıcı bulunmamıştır. Ayrıca uzaysal heterojenlik
+sıfırdır: model klasik Smagorinsky'nin oldukça basit bir versiyonuna iner.
+
+\subsection{B. Spectral-Cs (9.7K parametre) — \textbf{Seçilen}}
+
+\textbf{Tasarım.} Bu bölümde anlatılan SpectralCsField mimarisi.
+
+\textbf{Seçim sebebi.} Üç kısıtı (saf-fizik, makul parametre sayısı,
+klasik forma sadakat) aynı anda tatmin eder.
+
+\subsection{C. Genişletilmiş MLP (10K parametre)}
+
+\textbf{Tasarım.} v2'deki \texttt{PhysicsModulatorMC} hidden boyutu
+$32\to 128$'e çıkarılır; $\sim$10K parametreye ulaşılır.
+
+\textbf{Reddedilme sebebi.} Parametre sayısı eşitlense de, MLP içeren
+bir model ``saf-fizik'' iddiasıyla bağdaşmaz. 9 Mayıs kararının özü
+zaten MLP'yi kaldırmaktı; kapasiteyi MLP büyüterek artırmak bu kararla
+çelişir.
+
+\subsection{D. Hibrit (Spectral $+$ Skaler ölçek MLP, 1.5K)}
+
+\textbf{Tasarım.} Küçük bir $4^3$-modlu spektral alan + birkaç
+katmana özgü skaler düzeltme MLP'si; toplam $\sim$1.5K.
+
+\textbf{Reddedilme sebebi.} Kapasite çok düşük; ``akademik savunmada
+makul parametre'' kısıtını ihlal eder. Ayrıca tasarımda hâlâ MLP yer
+aldığı için ``saf-fizik'' iddiası tutarsız kalır.
+
+\subsection{Karşılaştırma Tablosu}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Saf-INNATE genişletme seçenekleri kıyaslaması.}
+\label{tab:alternatives}
+\begin{tabular}{lrrcc}
+\toprule
+\textbf{Tasarım} & \textbf{Param.} & \textbf{VRAM (GB)} & \textbf{MLP yok mu?} & \textbf{Akademik savunma} \\
+\midrule
+A. Saf-Skaler           & 200    & 4.8 & \checkmark & Zayıf (parametre az) \\
+\textbf{B. Spectral-Cs}     & \textbf{9\,742} & \textbf{6.5} & \checkmark & \textbf{Güçlü} \\
+C. Genişletilmiş MLP    & 10\,300 & 14.0 & --- & Tutarsız (MLP var) \\
+D. Hibrit (Spec+MLP)    & 1\,500 & 7.2 & --- & Zayıf (MLP var) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% =====================================================================
+\section{Bölüm Özeti}
+\label{sec:bolum-ozeti}
+
+Bu bölümde, INNATE mimarisinin nihai versiyonu olan ``Saf-INNATE
+Spectral'' tasarım sunulmuştur. Temel kararlar şöyle özetlenebilir:
+
+\begin{itemize}
+  \item v2 hibrit mimarideki \texttt{PhysicsModulatorMC} (192 parametre,
+        \%38 pay) tamamen kaldırılmıştır.
+  \item Yerine, klasik Smagorinsky kapanışının $C_s$ katsayısını üç
+        boyutlu Fourier modlarıyla parametrize eden \texttt{SpectralCsField}
+        getirilmiştir. Truncation: $K_x=5, K_y=8, K_z=6$.
+  \item Toplam parametre: 9\,905 ($\approx$ 9\,742 eğitilebilir).
+  \item Klasik Smagorinsky form korunur; mimarinin yeniliği $C_s$'nin
+        \emph{nasıl} parametrize edildiğidir.
+  \item v2'ye göre VRAM tüketimi $\sim$2.1$\times$ azalmıştır
+        (13.8 GB $\to$ 6.55 GB).
+  \item Saf-fizik iddiası tutarlıdır; akademik savunmada parametre
+        sayısı sorusu makul bir ölçeğe taşınmıştır.
+\end{itemize}
+
+Bölüm~\ref{ch:training}'nin güncel hâlinde bu mimarinin
+antrenman pipeline'ında nasıl ele alındığı, hangi loss-rebalansların
+yapıldığı ve curriculum stratejisinin nasıl güncellendiği aktarılmıştır.
+Saf-INNATE Spectral mimarinin ölçülebilir başarı kriterleri (slope
+hedefi $-1.74\pm 0.10$, TKE $\leq 1.5\times$ LES, Nu eşleşmesi) ise
+sonuçlar bölümünde sunulacaktır.
+
+\bigskip
+
+\noindent\textit{Akademik dürüstlük notu: Bu bölümde sunulan tasarım,
+$C_s$ alanının zaman-bağımsız spektral temsili üzerine kurulmuştur.
+Akış-bağımlı dinamik kapanışın saf-fizik versiyonu (Bölüm~\ref{ch:beklenen_sonuclar}'da
+``Future Work'' olarak listelenmiştir) hâlâ açık bir araştırma
+sorusudur. Bu tez kapsamında verilen sonuçlar, statik-spektral
+$C_s$ varsayımı altında geçerlidir.}

@@ -1,0 +1,335 @@
+\documentclass[12pt,a4paper]{report}
+
+% ------------------------
+% PAKETLER
+% ------------------------
+\usepackage[turkish]{babel}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{mathptmx}  % Times New Roman font
+\usepackage{setspace}
+\usepackage{geometry}
+\usepackage{titlesec}  % Bölüm başlık formatı için
+\usepackage{graphicx}
+\AtBeginDocument{\shorthandoff{=}}
+\usepackage{keyval}
+\usepackage{amsmath, amssymb}
+\usepackage{physics}
+\usepackage{siunitx}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{listingsutf8}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds, calc, decorations.pathreplacing}
+
+% Türkçe algoritma başlığı
+\makeatletter
+\renewcommand{\ALG@name}{Algoritma}
+\makeatother
+\floatname{algorithm}{Algoritma}
+\algrenewcommand\algorithmicrequire{\textbf{Girdi:}}
+\algrenewcommand\algorithmicensure{\textbf{Çıktı:}}
+\algrenewcommand\algorithmicwhile{\textbf{döngü}}
+\algrenewcommand\algorithmicdo{\textbf{yap}}
+\algrenewcommand\algorithmicend{\textbf{son}}
+\algrenewcommand\algorithmicfor{\textbf{her}}
+\algrenewcommand\algorithmicif{\textbf{eğer}}
+\algrenewcommand\algorithmicthen{\textbf{ise}}
+\algrenewcommand\algorithmicelse{\textbf{değilse}}
+\algrenewcommand\algorithmicreturn{\textbf{döndür}}
+
+% TikZ stilleri
+\tikzset{
+  blok/.style={rectangle, draw, thick, minimum width=2.4cm, minimum height=0.9cm, align=center, font=\small},
+  fizyon/.style={rectangle, draw, thick, fill=blue!10, minimum width=2.4cm, minimum height=0.9cm, align=center, font=\small},
+  tier1/.style={rectangle, draw, thick, fill=red!15, minimum width=3.2cm, minimum height=0.9cm, align=center, font=\small},
+  tier2/.style={rectangle, draw, thick, fill=green!15, minimum width=3.2cm, minimum height=0.9cm, align=center, font=\small},
+  tier3/.style={rectangle, draw, thick, fill=yellow!20, minimum width=3.2cm, minimum height=0.9cm, align=center, font=\small},
+  ok/.style={-Stealth, thick},
+}
+
+\lstset{
+  language=Python,
+  basicstyle=\ttfamily\footnotesize,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=4,
+  inputencoding=utf8,
+  upquote=true,
+  extendedchars=true,
+  keywordstyle=\color{blue},
+  commentstyle=\color{gray},
+  stringstyle=\color{red},
+  frame=single,
+  literate=
+   {ğ}{{\u{g}}}1 {Ğ}{{\u{G}}}1
+   {ş}{{\c{s}}}1 {Ş}{{\c{S}}}1
+   {ı}{{\i}}1   {İ}{{\.{I}}}1
+   {ö}{{\"o}}1  {Ö}{{\"O}}1
+   {ü}{{\"u}}1  {Ü}{{\"U}}1
+   {ç}{{\c{c}}}1 {Ç}{{\c{C}}}1
+   {π}{{$\pi$}}1
+   {×}{{$\times$}}1
+   {≈}{{$\approx$}}1
+   {—}{{--}}1
+   {–}{{-}}1
+   {’}{{'}}1
+   {‘}{{'}}1
+   {“}{{"}}1
+   {”}{{"}}1
+}
+
+% ------------------------
+% SAYFA AYARLARI
+% ------------------------
+\geometry{
+  left=4cm,
+  right=2.5cm,
+  top=2.5cm,
+  bottom=2.5cm
+}
+
+\onehalfspacing
+\setlength{\parskip}{6pt}
+\setlength{\parindent}{1.25cm}
+
+% Bölüm başlık formatı: "1. GİRİŞ" şeklinde
+\titleformat{\chapter}[display]
+  {\normalfont\Large\bfseries}
+  {\thechapter.}
+  {0.5em}
+  {\Large\MakeUppercase}
+\titlespacing*{\chapter}{0pt}{-20pt}{20pt}
+
+% Kaynaklar başlığı
+\renewcommand{\bibname}{KAYNAKLAR}
+
+% ------------------------
+% BAŞLIK BİLGİLERİ
+% ------------------------
+\title{
+\Large \textbf{Üç Boyutlu Karışık Konveksiyon Akışının Fizik Tabanlı Sinir Operatörü (INNATE) ile Çözümü}\\
+\vspace{1cm}
+\normalsize Bitirme Çalışması
+}
+
+\author{
+\textbf{Berke Tezgöçen} \\
+Öğrenci No: 090200140 \\
+\vspace{0.5cm} \\
+Danışman: Prof. Dr. Emre Onur Kahya
+}
+
+\date{BAHAR 2025--2026}
+
+% ------------------------
+% DÖKÜMAN BAŞI
+% ------------------------
+\begin{document}
+
+\begin{titlepage}
+    \centering
+
+    {\Large \textbf{İSTANBUL TEKNİK ÜNİVERSİTESİ}}\\[0.3cm]
+    {\Large \textbf{FEN-EDEBİYAT FAKÜLTESİ}}\\[1cm]
+    \includegraphics[width=4cm]{itu_logo.png}\\[1cm]
+    {\Large \textbf{BİTİRME ÇALIŞMASI}}\\[1.2cm]
+
+    {\Large \textbf{Üç Boyutlu Karışık Konveksiyon Akışının Fizik Tabanlı Sinir Operatörü (INNATE) ile Çözümü}}\\[1.8cm]
+
+    {\large Berke Tezgöçen}\\[2cm]
+
+    {\large \textit{Bölümü} \hspace{1cm}: Fizik Mühendisliği Bölümü}\\[1.5cm]
+
+    {\large \textbf{BAHAR 25--26}}
+\end{titlepage}
+
+\pagenumbering{roman}
+
+% ------------------------
+% ÖZET
+% ------------------------
+\chapter*{ÖZET}
+\addcontentsline{toc}{chapter}{ÖZET}
+
+Bu çalışmada, üç boyutlu karışık konveksiyon (mixed convection) akışı için fiziksel
+operatörleri doğrudan mimari yapısına gömen bir saf-fizik sinir operatörü olan INNATE
+(\textit{Intrinsic Navier--Stokes Neural Architecture for Temporal Evolution})
+geliştirilmiş ve uygulanmıştır. Problem, $[0,L_{x}]\times[0,L_{y}]\times[0,L_{z}]$
+periyodik küp benzeri bölgede (dikey eksen $y$), Boussinesq yaklaşımı altında sıkıştırılamaz Navier--Stokes
+ve enerji (sıcaklık) denklemleri ile $\mathrm{Re}=10\,000$ ve $\mathrm{Ra}=10^{5}$
+koşullarında ele alınmıştır. Akış, alttan ısıtılıp üstten soğutulan Rayleigh--B\'enard tipi termal katmanlanma ile büyük ölçeklerde Kolmogorov tipi mekanik zorlamanın aynı anda etkin olduğu bir karışık konveksiyon konfigürasyonunu temsil eder. Çözüm doğrulaması için Smagorinsky alt-ızgara modeli ile
+düşük-Mach LES (Large Eddy Simulation) referans veri seti üretilmiş, INNATE çıktıları
+bu referansla türbülans kinetik enerjisi (TKE), Nusselt sayısı, sıcaklık dalgalanma
+şiddeti ve enerji spektrumu üzerinden karşılaştırılmıştır.
+
+Önerilen mimari, klasik çok katmanlı algılayıcı (MLP) modüllerini içermez; bu anlamda \emph{mimari açıdan saf-fizik}'tir. Bunun yerine adveksiyon, difüzyon, projeksiyon, kaldırma kuvveti, alt-ızgara viskozitesi ve zorlama gibi akışkanlar mekaniği operatörlerini doğrudan fiziksel nöronlar olarak tanımlar. Eğitim ise saf-veri ya da saf-fizik değil, \emph{LES-destekli} (data-assisted) bir yaklaşımdır: minimal kayıp setinde, modelin çıktısı ile bağımsız LES referansı arasında bir uzaysal korelasyon kaybı yer alır. Modelin tamamı 9905 öğrenilebilir parametre içerir ve fraksiyonel adım
+IMEX (\textit{implicit-explicit}) zaman integratörünün 20 katmanı boyunca açıkça
+\textit{unroll} edilerek eğitilir. Eğitim süreci üç aşamalı bir disiplin altında
+yürütülmüştür: (i) Kademe~1 olarak adlandırılan parametre hijyeni aşamasında 120
+kanonik fiziksel katsayı dondurularak modelin denklemleri yeniden öğrenmesi
+engellenmiştir; (ii) Kademe~2 olarak adlandırılan PDE artığı (residual) aşamasında
+momentum ve enerji denklemlerinin konvektif formu doğrudan kayıp fonksiyonuna
+eklenmiştir; (iii) Kademe~3 olarak adlandırılan minimal kayıp aşamasında 27
+heterojen kayıp terimi 5 fizik-tutarlı terime indirgenmiştir.
+
+Saf-fizik mimarinin geliştirilmesi sırasında karşılaşılan iki temel başarısızlık
+modu ayrıntılı biçimde sunulmuştur: (a) modülatörsüz versiyonlarda gözlemlenen
+\textit{amplitude pumping} (parametre kaçışı) ve (b) yetersiz spektral
+yönlendirme nedeniyle ortaya çıkan anti-fiziksel Nusselt değerleri
+($\mathrm{Nu} \sim 200\text{--}430$). Kademe~1+2+3 disiplinli yaklaşımı
+uygulandıktan sonra modelin Nusselt sayısı 99.27, türbülans kinetik
+enerjisi 0.0073 ve enerji spektrumu eğimi $-1.84$ değerine ulaşmış; bu değerler
+sırasıyla LES referansının $1.89$ katı, $0.82$ katı ve eğim olarak $\%10$
+mertebesinde uyumlu sonuçlardır. Spektrum eğimi ve TKE açısından LES ile yakın
+uyum sağlanırken, sıcaklık dalgalanma şiddeti $\theta_{\mathrm{rms}}$ açısından
+modelin tam-eşlenik termal alanı yeniden üretemediği yapısal bir sınır tespit
+edilmiş ve akademik dürüstlük çerçevesinde tartışılmıştır.
+
+Sonuç olarak bu tez, fiziksel operatörlerin sinir ağı yapısına doğrudan gömülmesi
+yaklaşımının, çok ölçekli bir karışık konveksiyon probleminde dahi yorumlanabilir,
+düşük parametre sayılı ve fizik-tutarlı bir çözüm sağlayabileceğini göstermektedir.
+Çalışma aynı zamanda saf-fizik mimarilerin geliştirilmesi sürecinde karşılaşılan
+sayısal ve algoritmik tuzaklara dair bir el kitabı niteliğindedir.
+
+\textbf{Anahtar Kelimeler:}~Karışık konveksiyon (Mixed Convection),
+Boussinesq yaklaşımı,
+INNATE (Intrinsic Navier--Stokes Neural Architecture for Temporal Evolution),
+Fizik tabanlı sinir operatörü,
+Saf-fizik nöronlar,
+Büyük girdap simülasyonu (LES),
+Smagorinsky alt-ızgara modeli,
+Türbülans kinetik enerjisi,
+Nusselt sayısı,
+Enerji spektrumu,
+Fraksiyonel adım IMEX integratör,
+PDE artık kaybı,
+Kademeli eğitim disiplini,
+Parametre hijyeni.
+
+\newpage
+
+% ------------------------
+% TEŞEKKÜR
+% ------------------------
+\chapter*{TEŞEKKÜR}
+\addcontentsline{toc}{chapter}{TEŞEKKÜR}
+
+Lisans bitirme projemin ikinci dönem kanadı olan bu çalışma boyunca, hem ilk dönem
+INNATE önerisinin olgunlaştırılması hem de daha zorlu bir karışık konveksiyon
+probleminde uygulanması aşamalarında, akademik bilgilerini ve tecrübelerini
+benimle paylaşan, eleştirileri ve yapıcı yönlendirmeleri ile çalışmamı sağlam bir
+zemine oturtmama yardımcı olan değerli hocam Prof. Dr. Emre Onur Kahya'ya
+en içten teşekkürlerimi sunarım.
+
+Çalışmanın hesaplama kaynaklarını sağlayan ortamlara, türbülans modellemesi ve
+sayısal yöntemler üzerine yaptığım tartışmalarda görüşlerini esirgemeyen arkadaşlarıma
+ve bu süreçte beni destekleyen aileme teşekkür ederim.
+
+\newpage
+
+% ------------------------
+% İÇİNDEKİLER
+% ------------------------
+\tableofcontents
+\newpage
+
+% ------------------------
+% KISALTMALAR VE SEMBOLLER
+% ------------------------
+\chapter*{KISALTMALAR VE SEMBOLLER}
+\addcontentsline{toc}{chapter}{KISALTMALAR VE SEMBOLLER}
+
+\textbf{Kısaltmalar}
+\begin{tabbing}
+\hspace{3cm} \= \kill
+INNATE \> : Intrinsic Navier--Stokes Neural Architecture for Temporal Evolution \\
+PINN \> : Physics-Informed Neural Networks (Fizik Bilgili Sinir Ağları) \\
+PDE \> : Partial Differential Equation (Kısmi Diferansiyel Denklem) \\
+NS \> : Navier--Stokes \\
+DNS \> : Direct Numerical Simulation (Doğrudan Sayısal Simülasyon) \\
+LES \> : Large Eddy Simulation (Büyük Girdap Simülasyonu) \\
+SGS \> : Sub-Grid Scale (Alt-Izgara Ölçeği) \\
+RBC \> : Rayleigh--B\'enard Convection \\
+MC \> : Mixed Convection (Karışık Konveksiyon) \\
+TKE \> : Turbulent Kinetic Energy (Türbülans Kinetik Enerjisi) \\
+RMS \> : Root Mean Square (Karekök Ortalama) \\
+IMEX \> : Implicit--Explicit (Yarı Örtük Zaman İntegrasyonu) \\
+FFT \> : Fast Fourier Transform (Hızlı Fourier Dönüşümü) \\
+RK4 \> : Runge--Kutta 4. Mertebe \\
+CFL \> : Courant--Friedrichs--Lewy (Sayısal Kararlılık Koşulu) \\
+MLP \> : Multi-Layer Perceptron (Çok Katmanlı Algılayıcı) \\
+IC \> : Initial Condition (Başlangıç Koşulu) \\
+BC \> : Boundary Condition (Sınır Koşulu) \\
+FP32 \> : 32-bit Floating Point (32-bit Kayan Nokta) \\
+GPU \> : Graphics Processing Unit \\
+NaN \> : Not a Number (Sayısal Geçersiz Değer) \\
+LR \> : Learning Rate (Öğrenme Hızı) \\
+TBPTT \> : Truncated Back-Propagation Through Time \\
+\end{tabbing}
+
+\vspace{0.5cm}
+\textbf{Semboller}
+\begin{tabbing}
+\hspace{3cm} \= \kill
+$\mathbf{u}$ \> : Hız vektörü, $(u, v, w)$ \\
+$u, v, w$ \> : Hız bileşenleri \\
+$p$ \> : Basınç \\
+$\theta$ \> : Boyutsuzlaştırılmış sıcaklık dalgalanması \\
+$\rho$ \> : Akışkan yoğunluğu \\
+$\nu$ \> : Kinematik viskozite \\
+$\alpha$ \> : Termal diffüzivite \\
+$g$ \> : Yer çekimi ivmesi \\
+$\beta$ \> : Termal genleşme katsayısı \\
+$\Delta T$ \> : Karakteristik sıcaklık farkı \\
+$\mathrm{Re}$ \> : Reynolds sayısı, $UL/\nu$ \\
+$\mathrm{Ra}$ \> : Rayleigh sayısı, $g\beta\Delta T L^{3}/(\nu\alpha)$ \\
+$\mathrm{Pr}$ \> : Prandtl sayısı, $\nu/\alpha$ \\
+$\mathrm{Ri}$ \> : Richardson sayısı, $\mathrm{Ra}/(\mathrm{Re}^{2}\mathrm{Pr})$ \\
+$\mathrm{Nu}$ \> : Nusselt sayısı \\
+$\boldsymbol{\omega}$ \> : Vortisite vektörü, $\nabla\times\mathbf{u}$ \\
+$E$ \> : Kinetik enerji \\
+$\mathcal{E}$ \> : Enstrofi, $\langle|\boldsymbol{\omega}|^{2}\rangle$ \\
+$\mathrm{TKE}$ \> : Türbülans kinetik enerjisi, $\tfrac{1}{2}\langle u_i' u_i'\rangle$ \\
+$E(k)$ \> : Enerji spektrumu (dalga sayısı $k$ uzayında) \\
+$\nu_{t}$ \> : Alt-ızgara (eddy) viskozitesi \\
+$C_{s}$ \> : Smagorinsky sabiti \\
+$\Delta$ \> : Izgara filtre uzunluğu \\
+$|S|$ \> : Gerinim tensörü genliği, $\sqrt{2 S_{ij}S_{ij}}$ \\
+$\mathcal{L}$ \> : Kayıp fonksiyonu \\
+$\lambda$ \> : Kayıp ağırlık katsayısı \\
+$N_{\theta}$ \> : Öğrenilebilir parametre sayısı \\
+\end{tabbing}
+
+\newpage
+
+\pagenumbering{arabic}
+
+% ------------------------
+% BÖLÜMLER
+% ------------------------
+\input{bolum1_giris.tex}
+\input{bolum2_teorik.tex}
+\input{bolum3_mimari.tex}
+\input{bolum4_bulgular.tex}
+\input{bolum5_sonuclar.tex}
+
+% ------------------------
+% KAYNAKLAR
+% ------------------------
+\addcontentsline{toc}{chapter}{KAYNAKLAR}
+\input{kaynaklar.tex}
+
+\end{document}

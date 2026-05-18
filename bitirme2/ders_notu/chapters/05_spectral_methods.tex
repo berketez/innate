@@ -1,0 +1,564 @@
+\chapter{Spectral Yöntemler}
+\label{ch:spectral}
+
+Bu bölümde, periyodik sınır koşullarında PDE çözümünün en güçlü yöntemlerinden biri olan \textbf{spectral yöntemler}i inceliyoruz.
+Temel fikir basit: fonksiyonu Fourier uzayina taşi, türev almak yerine çarpım yap, sonra geri dön.
+Bu yaklaşim, sonlu fark (finite difference) yöntemlerine kiyasla \emph{üstel yakinsama} (exponential convergence) sağlar.
+
+
+% ============================================================
+\section{Fourier Serileri}
+\label{sec:fourier_serileri}
+
+\subsection{Gerçel Form}
+
+Periyodik bir $f(x)$ fonksiyonunu ($f(x+L) = f(x)$) trigonometrik fonksiyonlarin toplami olarak yazabiliriz:
+
+\begin{equation}
+\label{eq:fourier_reel}
+f(x) = \frac{a_0}{2} + \sum_{n=1}^{\infty} \left[ a_n \cos\!\left(\frac{2\pi n x}{L}\right) + b_n \sin\!\left(\frac{2\pi n x}{L}\right) \right]
+\end{equation}
+
+Burada $L$ periyot, $a_n$ ve $b_n$ Fourier katsayilari:
+\begin{align}
+a_n &= \frac{2}{L} \int_0^L f(x)\cos\!\left(\frac{2\pi n x}{L}\right) dx, \label{eq:an} \\
+b_n &= \frac{2}{L} \int_0^L f(x)\sin\!\left(\frac{2\pi n x}{L}\right) dx. \label{eq:bn}
+\end{align}
+
+\begin{remark}
+$a_0/2$ terimi fonksiyonun \textbf{ortalama değeri}dir: $a_0/2 = \frac{1}{L}\int_0^L f(x)\,dx$.
+\end{remark}
+
+\subsection{Kompleks (Exponential) Form}
+
+Euler bağintisi $e^{i\theta} = \cos\theta + i\sin\theta$ kullanilarak, gerçel form çok daha zarif bir biçimde yazilabilir. $\cos$ ve $\sin$ terimlerini birleştirelim:
+\begin{align}
+a_n\cos(k_n x) + b_n\sin(k_n x) &= \frac{a_n - ib_n}{2}\,e^{ik_n x} + \frac{a_n + ib_n}{2}\,e^{-ik_n x}
+\end{align}
+Burada $k_n = 2\pi n / L$ dalga sayisidir. $\hat{c}_n \equiv (a_n - ib_n)/2$ tanimlanirsa:
+
+\begin{equation}
+\boxed{f(x) = \sum_{n=-\infty}^{\infty} \hat{c}_n \, e^{i k_n x}, \qquad k_n = \frac{2\pi n}{L}}
+\label{eq:fourier_complex}
+\end{equation}
+
+\textbf{Fourier katsayilari} ortogonallik bağintisi $\frac{1}{L}\int_0^L e^{ik_n x}e^{-ik_m x}dx = \delta_{nm}$ kullanilarak:
+\begin{equation}
+\boxed{\hat{c}_n = \frac{1}{L}\int_0^{L} f(x)\,e^{-ik_n x}\,dx}
+\label{eq:fourier_coeff}
+\end{equation}
+
+Bu kompleks form, türev alma işlemini dramatik biçimde basitleştirecek.
+
+
+% ============================================================
+\section{Ayrik Fourier Dönüşümü (DFT)}
+\label{sec:dft}
+
+Bilgisayarda sürekli Fourier integralini hesaplayamayız. Onun yerine fonksiyonu $N$ ayrik noktada örnekleriz.
+
+\subsection{Grid Tanimlamasi}
+
+$[0, L)$ araligini eşit araliklara bölelim:
+\begin{equation}
+x_j = j\,\Delta x, \qquad j = 0, 1, \ldots, N-1, \qquad \Delta x = \frac{L}{N}
+\label{eq:grid}
+\end{equation}
+
+\begin{remark}
+$N$ nokta ile $x_0 = 0$ ve $x_{N-1} = L - \Delta x$ olur. $x_N = L$ noktasi dahil \emph{edilmez} çünkü periyodik siniir koşulunda $f(0) = f(L)$ olduğundan bu nokta $x_0$ ile aynidir.
+\end{remark}
+
+\subsection{DFT Tanimi}
+
+Sürekli Fourier integralinin ayrik karşiliği:
+
+\begin{equation}
+\boxed{\hat{f}_k = \sum_{j=0}^{N-1} f_j \, e^{-2\pi i j k / N}, \qquad k = 0, 1, \ldots, N-1}
+\label{eq:dft}
+\end{equation}
+
+Ters dönüşüm (IDFT):
+\begin{equation}
+\boxed{f_j = \frac{1}{N}\sum_{k=0}^{N-1} \hat{f}_k \, e^{2\pi i j k / N}, \qquad j = 0, 1, \ldots, N-1}
+\label{eq:idft}
+\end{equation}
+
+\begin{remark}
+$1/N$ normalizasyonu IDFT'de. Bazi kaynaklarda (ve NumPy/PyTorch'ta) DFT'de $1/\sqrt{N}$ kullanilir. \textbf{Tutarlilik önemli}: DFT$\cdot$IDFT $= $ identity olmalı.
+\end{remark}
+
+\subsection{Dalga Sayilari ve Nyquist Frekansi}
+
+$N$ noktayla temsil edilebilecek dalga sayilari sinirlidir:
+\begin{equation}
+k_n = \frac{2\pi n}{L}, \qquad n = -\frac{N}{2}, \ldots, -1, 0, 1, \ldots, \frac{N}{2} - 1
+\label{eq:wavenumbers}
+\end{equation}
+
+\textbf{Nyquist frekansi}: temsil edilebilecek en yüksek frekans
+\begin{equation}
+k_{\max} = \frac{2\pi}{L}\cdot\frac{N}{2} = \frac{\pi}{\Delta x}
+\label{eq:nyquist}
+\end{equation}
+
+Fiziksel yorum: en az 2 grid noktasi ile temsil edilebilecek en kisa dalga boyu $\lambda_{\min} = 2\Delta x$'tir.
+Bu, \textbf{Shannon-Nyquist örnekleme teoremi}nin doğrudan sonuçudur.
+
+
+% ============================================================
+\section{FFT Algoritmasi}
+\label{sec:fft}
+
+\subsection{Hesaplama Karmaşıklığı}
+
+DFT'yi (\ref{eq:dft}) doğrudan hesaplamak:
+\begin{itemize}
+\item Her $\hat{f}_k$ için $N$ çarpma + $N$ toplama $\Rightarrow$ toplam $O(N^2)$ işlem.
+\item $N = 10^6$ için $10^{12}$ işlem --- pratik değil.
+\end{itemize}
+
+\subsection{Cooley-Tukey (1965): Böl ve Yönet}
+
+FFT (Fast Fourier Transform), DFT'yi $O(N \log N)$'e düşüren algoritmadir.
+Temel fikir: $N$-nokta DFT'yi iki $N/2$-nokta DFT'ye böl:
+
+\begin{align}
+\hat{f}_k &= \sum_{j=0}^{N-1} f_j\, e^{-2\pi i jk/N} \notag \\
+&= \underbrace{\sum_{m=0}^{N/2-1} f_{2m}\, e^{-2\pi i mk/(N/2)}}_{\text{{çift indeksler}}: \; E_k}
+\;+\;
+e^{-2\pi ik/N}\;\underbrace{\sum_{m=0}^{N/2-1} f_{2m+1}\, e^{-2\pi i mk/(N/2)}}_{\text{tek indeksler}: \; O_k}
+\label{eq:fft_decomp}
+\end{align}
+
+Yani:
+\begin{equation}
+\hat{f}_k = E_k + W^k \cdot O_k, \qquad W = e^{-2\pi i / N}\;\text{(twiddle factor)}
+\label{eq:butterfly}
+\end{equation}
+
+Bu bölüme rekürsif olarak uygulanir:
+\begin{equation}
+\underbrace{N}_{\text{DFT}} \to 2\times\frac{N}{2} \to 4\times\frac{N}{4} \to \cdots \to N\times 1
+\qquad \Rightarrow \quad \log_2 N \;\text{seviye} \times N \;\text{işlem/seviye} = O(N\log N)
+\end{equation}
+
+\begin{example}
+Hiz karşilastirmasi ($N = 96 \times 160 \times 64 = 983{,}040$ --- bizim grid):
+\begin{itemize}
+\item Dogrudan DFT: $N^2 \approx 10^{12}$ işlem
+\item FFT: $N\log_2 N \approx 2\times10^7$ işlem
+\item \textbf{Hizlanma}: $\sim 50{,}000\times$
+\end{itemize}
+\end{example}
+
+\subsection{3D FFT}
+
+Üç boyutlu DFT, her boyutta ardisik 1D FFT'ler olarak hesaplanir (tensor çarpimi yapisi):
+\begin{equation}
+\hat{f}(k_x, k_y, k_z) = \text{FFT}_z\!\Big(\text{FFT}_y\!\big(\text{FFT}_x\!\big(f(x,y,z)\big)\big)\Big)
+\end{equation}
+
+PyTorch'ta tek satirla:
+\begin{lstlisting}[caption={3D FFT PyTorch'ta},label={lst:fft3d}]
+import torch.fft as fft
+f_hat = fft.fftn(f, dim=(-3, -2, -1))  # 3 boyutta FFT
+\end{lstlisting}
+
+
+% ============================================================
+\section{Spectral Türev Hesaplama}
+\label{sec:spectral_deriv}
+
+Spectral yöntemlerin as gizli silahi: \textbf{türev almak, Fourier uzayinda çarpmaya dönüşür}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{spectral_derivative.png}
+\caption{Spectral türev hesaplama: fiziksel uzayda $f(x)$ ve $f'(x)$ (üst), Fourier uzayinda $|\hat{f}(k)|$ ve $|ik\hat{f}(k)|$ (alt). FFT $\to$ $ik$ ile çarpma $\to$ IFFT.}
+\label{fig:spectral_derivative}
+\end{figure}
+
+\subsection{Temel Teorem: Birinci Türev}
+
+\begin{theorem}[Spectral Türev]
+\label{thm:spectral_deriv}
+$f(x)$ periyodik ve pürüzsüz bir fonksiyon olsun. O zaman:
+\begin{equation}
+\boxed{f'(x) = \mathcal{F}^{-1}\!\big[\,ik\cdot\hat{f}(k)\,\big]}
+\label{eq:spectral_deriv}
+\end{equation}
+Yani: $f'(x) = \text{IFFT}\big(ik \cdot \text{FFT}(f)\big)$
+\end{theorem}
+
+\begin{proof}[Türetme]
+Fourier serisi temsili ile baslayalim:
+\begin{equation}
+f(x) = \sum_{n=-\infty}^{\infty} \hat{c}_n\, e^{ik_n x}
+\end{equation}
+
+Her iki tarafi $x$'e gore türetelim. Toplam ve türev yer değiştirebilir (üniform yakinsama):
+\begin{align}
+f'(x) &= \frac{d}{dx}\sum_{n=-\infty}^{\infty}\hat{c}_n\,e^{ik_n x} \notag \\
+&= \sum_{n=-\infty}^{\infty}\hat{c}_n\cdot\frac{d}{dx}e^{ik_n x} \notag \\
+&= \sum_{n=-\infty}^{\infty}\hat{c}_n\cdot (ik_n)\,e^{ik_n x} \notag \\
+&= \sum_{n=-\infty}^{\infty}\underbrace{(ik_n\,\hat{c}_n)}_{\widehat{f'}(k_n)}\,e^{ik_n x}
+\label{eq:spectral_deriv_proof}
+\end{align}
+
+Sonuçu okuyalim: $f'(x)$'in Fourier katsayilari $ik_n\,\hat{c}_n$'dir. Yani \textbf{türev almak} = \textbf{Fourier katsayisini $ik$ ile çarpmak}.
+\end{proof}
+
+\subsection{İkinci Türev}
+
+Ayni mantigi iki kez uygulayelim:
+\begin{align}
+f''(x) &= \frac{d}{dx}f'(x) = \frac{d}{dx}\sum_n (ik_n)\hat{c}_n\,e^{ik_n x} \notag \\
+&= \sum_n (ik_n)^2\,\hat{c}_n\,e^{ik_n x} = \sum_n (-k_n^2)\,\hat{c}_n\,e^{ik_n x}
+\end{align}
+
+\begin{equation}
+\boxed{f''(x) = \mathcal{F}^{-1}\!\big[-k^2 \cdot \hat{f}(k)\big]}
+\label{eq:spectral_2nd_deriv}
+\end{equation}
+
+Genel olarak $m$-inci türev:
+\begin{equation}
+\frac{d^m f}{dx^m} = \mathcal{F}^{-1}\!\big[(ik)^m \cdot \hat{f}(k)\big]
+\label{eq:spectral_mth_deriv}
+\end{equation}
+
+\subsection{3D'de Gradient ve Laplacian}
+
+Üç boyutlu $f(x,y,z)$ fonksiyonu için her yöndeki türev bağimsiz olarak hesaplanir. $\hat{f}(k_x,k_y,k_z)$ 3D Fourier dönüşümünü göstersin:
+
+\textbf{Gradient:}
+\begin{equation}
+\pd{f}{x} = \mathcal{F}^{-1}\!\big[ik_x\cdot\hat{f}(k_x,k_y,k_z)\big], \qquad
+\pd{f}{y} = \mathcal{F}^{-1}\!\big[ik_y\cdot\hat{f}\big], \qquad
+\pd{f}{z} = \mathcal{F}^{-1}\!\big[ik_z\cdot\hat{f}\big]
+\label{eq:3d_gradient}
+\end{equation}
+
+\textbf{Laplacian:}
+\begin{align}
+\laplacian f &= \pdd{f}{x} + \pdd{f}{y} + \pdd{f}{z} \notag \\
+&= \mathcal{F}^{-1}\!\big[(-k_x^2)\hat{f}\big] + \mathcal{F}^{-1}\!\big[(-k_y^2)\hat{f}\big] + \mathcal{F}^{-1}\!\big[(-k_z^2)\hat{f}\big] \notag \\
+&= \mathcal{F}^{-1}\!\big[-(k_x^2 + k_y^2 + k_z^2)\cdot\hat{f}\big]
+\end{align}
+
+\begin{equation}
+\boxed{\laplacian f = \mathcal{F}^{-1}\!\Big[-|\vect{k}|^2 \cdot \hat{f}(\vect{k})\Big], \qquad |\vect{k}|^2 = k_x^2 + k_y^2 + k_z^2}
+\label{eq:spectral_laplacian_3d}
+\end{equation}
+
+\subsection{Sayisal Örnek}
+
+$L = 2\pi$ periyotlu $f(x) = \sin(2\pi x / L) = \sin(x)$ fonksiyonunun türevi $f'(x) = \cos(x)$ olduğunu biliyoruz. Spectral yöntemle doğrulayalım:
+
+\begin{enumerate}
+\item $f(x) = \sin(x)$ fonksiyonunun Fourier dönüşümü:
+\begin{equation}
+\sin(x) = \frac{e^{ix} - e^{-ix}}{2i} \qquad\Rightarrow\qquad \hat{c}_1 = \frac{1}{2i} = -\frac{i}{2},\quad \hat{c}_{-1} = \frac{i}{2}
+\end{equation}
+\item $ik$ ile çarpalim ($k_1 = 1$, $k_{-1} = -1$):
+\begin{align}
+ik_1 \cdot \hat{c}_1 &= i\cdot 1 \cdot\left(-\frac{i}{2}\right) = -\frac{i^2}{2} = \frac{1}{2} \\
+ik_{-1}\cdot\hat{c}_{-1} &= i\cdot(-1)\cdot\frac{i}{2} = -\frac{i^2}{2} = \frac{1}{2}
+\end{align}
+\item Ters dönüşüm:
+\begin{equation}
+f'(x) = \frac{1}{2}\,e^{ix} + \frac{1}{2}\,e^{-ix} = \cos(x) \quad\checkmark
+\end{equation}
+\end{enumerate}
+
+
+% ============================================================
+\section{Anizotropik Domain}
+\label{sec:anisotropic}
+
+\subsection{Bizim Problem Geometrisi}
+
+Projemizdeki periyodik kutu eşit kenarli değil:
+\begin{equation}
+\text{Domain:}\quad L_x = 6, \quad L_y = 10, \quad L_z = 4
+\end{equation}
+\begin{equation}
+\text{Grid:}\quad N_x = 96, \quad N_y = 160, \quad N_z = 64
+\end{equation}
+
+\subsection{Yöne Bagli Dalga Sayilari}
+
+Her yönün kendi periyodu ve grid çözünürlüğü oldugundan, dalga sayilari yönden yöne değişir:
+\begin{equation}
+k_x^{(n)} = \frac{2\pi n}{L_x}, \qquad
+k_y^{(m)} = \frac{2\pi m}{L_y}, \qquad
+k_z^{(l)} = \frac{2\pi l}{L_z}
+\label{eq:aniso_wavenumbers}
+\end{equation}
+
+\begin{example}
+Sayisal degerler:
+\begin{itemize}
+\item $x$ yonunde: $\Delta k_x = 2\pi/6 \approx 1.047$, \quad $k_{x,\max} = \pi N_x/L_x = \pi\cdot96/6 \approx 50.3$
+\item $y$ yonunde: $\Delta k_y = 2\pi/10 \approx 0.628$, \quad $k_{y,\max} = \pi\cdot160/10 \approx 50.3$
+\item $z$ yonunde: $\Delta k_z = 2\pi/4 \approx 1.571$, \quad $k_{z,\max} = \pi\cdot64/4 \approx 50.3$
+\end{itemize}
+
+Grid orani $N/L$ her yonde esit tutulmustur ($96/6 = 160/10 = 64/4 = 16$), bu da fiziksel cozunurlugu her yonde esitler.
+\end{example}
+
+\subsection{PyTorch Implementasyonu}
+
+\texttt{innate.py} icerisindeki \texttt{SpectralOps3DAniso} sinifi tam olarak bu anizotropik yapıyı uygular:
+
+\begin{lstlisting}[caption={SpectralOps3DAniso dalga sayisi hesabi},label={lst:aniso_wavenumbers}]
+# Her yon icin ayri dalga sayisi dizisi
+kx_1d = torch.fft.fftfreq(Nx, d=Lx/Nx) * 2*pi  # d = dx = Lx/Nx
+ky_1d = torch.fft.fftfreq(Ny, d=Ly/Ny) * 2*pi
+kz_1d = torch.fft.fftfreq(Nz, d=Lz/Nz) * 2*pi
+
+# 3D meshgrid
+kx, ky, kz = torch.meshgrid(kx_1d, ky_1d, kz_1d, indexing='ij')
+\end{lstlisting}
+
+\begin{remark}
+PyTorch'un \texttt{fftfreq(N, d=dx)} fonksiyonu $[0, 1, 2, \ldots, N/2-1, -N/2, \ldots, -1] / (N \cdot dx)$ dondurur. $2\pi$ ile carpmak, fiziksel dalga sayisi $k_n = 2\pi n/L$'yi verir.
+\end{remark}
+
+\subsubsection{Nyquist Modu Sifirlama}
+
+\texttt{SpectralOps3DAniso}'da ek bir incelik vardir: \textbf{Nyquist modunun sifirlanmasi}.
+\begin{lstlisting}[caption={Nyquist modu sifirlama}]
+if Nx % 2 == 0:
+    kx_1d[Nx // 2] = 0.0  # Nyquist modu sifirla
+\end{lstlisting}
+
+$N$ cift iken $k_{N/2}$ modu belirsizdir: $e^{i\pi j}$ hem $\cos(\pi j)$ hem $-\cos(\pi j)$ olarak yorumlanabilir. Türev hesabinda $ik_{N/2}\hat{f}_{N/2}$ terimi yalancı (spurious) bir salınım yaratır. Sifirlamak bu ambiguity'yi yok eder ve türevin gerçel kalmasini garantiler.
+
+
+% ============================================================
+\section{De-aliasing}
+\label{sec:dealiasing}
+
+\subsection{Problem: Nonlineer Terimlerde Aliasing}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{dealiasing.png}
+\caption{De-aliasing: 2/3 kuralı. $|k| > N/3$ olan modlar sıfırlanır (kırmızı bölge). Bu, nonlineer çarpım sonrası aliasing hatasını önler.}
+\label{fig:dealiasing}
+\end{figure}
+
+Navier-Stokes denklemindeki adveksiyon terimi $(\vect{u}\cdot\gradient)\vect{u}$ \textbf{nonlineerdir}: hız alanının kendisiyle çarpımı. Bu çarpım, Fourier uzayında \textbf{konvolüsyon}a karşılık gelir.
+
+İki Fourier modunun carpimini düşünelim:
+\begin{equation}
+e^{ik_m x}\cdot e^{ik_n x} = e^{i(k_m + k_n)x}
+\end{equation}
+
+Eğer $|k_m| \leq k_{\max}$ ve $|k_n| \leq k_{\max}$ ise, çarpim $|k_m + k_n| \leq 2k_{\max}$ dalga sayisina sahip olabilir. Ama bizim gridimiz sadece $|k| \leq k_{\max} = N/2$'ye kadar temsil edebilir. $N/2 < |k_m + k_n| \leq N$ arasindaki modlar ne olur?
+
+\textbf{Aliasing}: Temsil edilemeyen yüksek frekansli mod, düşük frekansli bir moda ``katlanir'':
+\begin{equation}
+e^{i(k_m + k_n)x_j} = e^{i(k_m + k_n - 2\pi N/L)x_j} \qquad\text{(grid üzerinde ayirt edilemez)}
+\end{equation}
+
+Bu, \textbf{sahte enerji} yaratir ve say\i{}sal çözümü bozar.
+
+\subsection{2/3 Kurali --- Türetme}
+\label{subsec:twothirds}
+
+Aliasing'i önlemenin en yaygin yöntemi \textbf{2/3 kurali} (Orszag, 1971): hesaplamadan önce $|k| > N/3$ olan modlari sifirla.
+
+\textbf{Neden tam olarak $N/3$?} Adim adim:
+
+\begin{enumerate}
+\item Carpimdan önce her iki çarpanin da $|k| \leq K$ modlari olsun.
+\item Carpim sonucu $|k| \leq 2K$ modlari içerecektir.
+\item Aliasing olmasin diye carpim sonucu gridin temsil sinirinda kalmali: $2K \leq k_{\max} = N/2$.
+\item Dolayisyla $K \leq N/4$.
+\end{enumerate}
+
+Bir dakika --- bu $N/4$ verir, ama pratikte $N/3$ kullaniliyor. Fark şuradan gelir: padded convolution ile degil, \emph{truncated} Fourier uzayinda çalisiyoruz. Daha dikkatli analiz:
+
+\begin{enumerate}
+\item Fonksiyonlarimiz $[-N/2, N/2)$ arasinda modlara sahip.
+\item $|k| > N/3$ modlarini sifirliyoruz, yani aktif modlar $|k| \leq N/3$.
+\item İki aktif mod çarpimi: $|k_m + k_n| \leq 2N/3$.
+\item $2N/3 < N/2$ olmadigi için aliasing olabilir, \emph{ama} $2N/3 < N$ oldugundan katlanma $N - 2N/3 = N/3$'ten büyük modlara gider --- bunlar zaten sifir!
+\item Yani aliased enerji zaten sifirlanmis modlara duuser ve gerçek modlari \emph{kirletmez}.
+\end{enumerate}
+
+\begin{equation}
+\boxed{\text{De-aliasing:}\quad \hat{f}_k = 0 \;\;\text{for}\;\; |k| > \frac{N}{3}}
+\label{eq:dealias_rule}
+\end{equation}
+
+\begin{remark}
+Etkin çözünürlük: $N = 96$ noktamiz varsa, sadece $N/3 = 32$ mod kullaniriz. Bu da cozunurlugun \%67'sini \emph{kullanmak}, \%33'ünü \emph{feda etmek} demektir. Pahali ama zorunlu.
+\end{remark}
+
+\subsection{3/2 Kurali (Padding Yöntemi)}
+
+Alternatif yaklasim: çözünürlük kaybetmek yerine, çarpimi daha büyük bir gridde yap:
+
+\begin{enumerate}
+\item Fourier katsayilarini $3N/2$ boyutlu bir diziye zero-pad et.
+\item $3N/2$ boyutlu IFFT ile fiziksel uzaya dön.
+\item Fiziksel uzayda çarpımı yap ($f\cdot g$ noktasal).
+\item $3N/2$ boyutlu FFT ile geri dön.
+\item $|k| > N/2$ modlarini at, $N$ boyutuna geri dön.
+\end{enumerate}
+
+Bu yöntem hiç mod kaybettirmez ama \%50 daha fazla bellek ve hesaplama gerektirir. Pratikte iki yöntem birbirine denk sonuçlar verir.
+
+\subsection{Kodda De-aliasing}
+
+\texttt{SpectralOps3DAniso} icerisinde 2/3 kurali uygulamasi:
+\begin{lstlisting}[caption={De-aliasing mask olusturma},label={lst:dealias}]
+# Mod indeksleri uzerinden 2/3 kurali
+mx = torch.fft.fftfreq(Nx, d=1.0) * Nx  # [-N/2, ..., N/2-1]
+my = torch.fft.fftfreq(Ny, d=1.0) * Ny
+mz = torch.fft.fftfreq(Nz, d=1.0) * Nz
+Mx, My, Mz = torch.meshgrid(mx, my, mz, indexing='ij')
+
+dealias_mask = (
+    (torch.abs(Mx) < Nx // 3) &
+    (torch.abs(My) < Ny // 3) &
+    (torch.abs(Mz) < Nz // 3)
+)
+\end{lstlisting}
+
+
+% ============================================================
+\section{Poisson Denklemi Spectral Çözümü}
+\label{sec:poisson}
+
+\subsection{Problem}
+
+Navier-Stokes çözümünde her zaman adiminda Poisson denklemi çözülmelidir:
+\begin{equation}
+\laplacian p = f \qquad\text{(verilen kaynak terimi $f$)}
+\label{eq:poisson}
+\end{equation}
+
+Sonlu fark yöntemlerinde bu, büyük bir lineer sistem ($Ap = f$) demektir --- iteratif çözücü (CG, GMRES, multigrid) gerektirir. Spectral yöntemde ise \textbf{dogrudan çözüm} mümkündür.
+
+\subsection{Türetme}
+
+Her iki tarafa 3D FFT uygulayalim:
+\begin{align}
+\laplacian p = f \qquad &\xrightarrow{\text{FFT}} \qquad -(k_x^2 + k_y^2 + k_z^2)\,\hat{p} = \hat{f} \notag \\
+&\xrightarrow{\text{çöz}} \qquad \hat{p}(\vect{k}) = \frac{-\hat{f}(\vect{k})}{|\vect{k}|^2}
+\label{eq:poisson_spectral}
+\end{align}
+
+\begin{equation}
+\boxed{p = \mathcal{F}^{-1}\!\left[\frac{-\hat{f}(\vect{k})}{k_x^2 + k_y^2 + k_z^2}\right]}
+\label{eq:poisson_solution}
+\end{equation}
+
+\subsection{$k = 0$ Modu}
+
+$\vect{k} = (0,0,0)$ için payda sifir olur. Bu mod fonksiyonun \textbf{uzaysal ortalamasi}dir:
+\begin{equation}
+\hat{p}(0,0,0) = \frac{1}{\text{Vol}}\int_\Omega p\,dV \equiv \langle p \rangle
+\end{equation}
+
+Periyodik siniir kosullarinda basinc $p$'ye bir sabit eklemek fizigi değiştirmez (çünkü sadece $\gradient p$ görülür). Bu yüzden:
+\begin{equation}
+\hat{p}(0,0,0) = 0 \qquad\text{(ortalama basinc sifir)}
+\label{eq:mean_pressure}
+\end{equation}
+
+\subsection{Pressure Projection (Helmholtz Ayrismasi)}
+\label{subsec:projection}
+
+Navier-Stokes çözümünde kritik bir adim: hız alanını \textbf{divergence-free} (sıkıştırılamaz) yapmak.
+
+\textbf{Helmholtz Ayrismasi Teoremi}: Her (pürüzsüz) vektör alan $\vect{v}$ iki bilesene ayrilabilir:
+\begin{equation}
+\vect{v} = \underbrace{\vect{u}}_{\text{solenoidal}\;(\divergence\vect{u}=0)} + \underbrace{\gradient\phi}_{\text{irrotasyonel}\;(\curl\gradient\phi=0)}
+\label{eq:helmholtz}
+\end{equation}
+
+Projection (Chorin, 1968): divergence-free olmayan $\vect{v}$'den solenoidal $\vect{u}$'yu cikarma:
+\begin{enumerate}
+\item Divergence hesapla: $d = \divergence\vect{v}$
+\item Poisson çöz: $\laplacian\phi = d$
+\item Gradient çikar: $\vect{u} = \vect{v} - \gradient\phi$
+\end{enumerate}
+
+Spectral uzayda tamami tek satirda:
+\begin{equation}
+\hat{\vect{u}} = \hat{\vect{v}} - \frac{\vect{k}(\vect{k}\cdot\hat{\vect{v}})}{|\vect{k}|^2}
+\label{eq:leray_projection}
+\end{equation}
+
+Bu \textbf{Leray projeksiyon operatörüdür}: $\mathbb{P} = \mathbb{I} - \vect{k}\vect{k}^T / |\vect{k}|^2$.
+
+\begin{lstlisting}[caption={Spectral Poisson çözümü ve projection},label={lst:poisson}]
+import torch.fft as fft
+
+# Poisson cozumu: nabla^2 p = rhs
+rhs_hat = fft.fftn(rhs)
+k_sq = kx**2 + ky**2 + kz**2
+k_sq_safe = k_sq.clone()
+k_sq_safe[k_sq_safe == 0] = 1.0    # Divide-by-zero onle
+
+p_hat = rhs_hat / (-k_sq_safe)
+p_hat[..., 0, 0, 0] = 0.0          # Ortalama basinc = 0
+p = fft.ifftn(p_hat).real
+
+# Divergence-free projection
+div_hat = 1j * (kx*u_hat + ky*v_hat + kz*w_hat)
+phi_hat = div_hat / (-k_sq_safe)
+phi_hat[..., 0, 0, 0] = 0.0
+u_hat -= 1j * kx * phi_hat          # u = u - dp/dx
+v_hat -= 1j * ky * phi_hat          # v = v - dp/dy
+w_hat -= 1j * kz * phi_hat          # w = w - dp/dz
+\end{lstlisting}
+
+
+% ============================================================
+\section{Spectral Yöntemlerin Avantaj ve Dezavantajlari}
+\label{sec:spectral_tradeoffs}
+
+\begin{table}[H]
+\centering
+\caption{Spectral vs. sonlu fark yöntemleri karsilastirmasi}
+\label{tab:spectral_vs_fd}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Özellik} & \textbf{Spectral (FFT)} & \textbf{Sonlu Fark} \\
+\midrule
+Türev dogrulugu & Üstel (exponential) & Polinom ($O(\Delta x^p)$) \\
+Hesaplama maliyeti & $O(N\log N)$ & $O(N)$ \\
+Poisson çözümü & Dogrudan & İteratif \\
+Siniir kosullari & Sadece periyodik & Her türlü \\
+Karmasik geometri & Uygulanamaz & Uygulanabilir \\
+Paralelleştirme & Zor (global FFT) & Kolay (lokal stencil) \\
+De-aliasing gereksinimi & Evet & Hayir \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Bizim problemimiz tamamen periyodik (6 kenar da periyodik BC), bu da spectral yöntemi \textbf{ideal} kilar. Eger bir kenar bile periyodik olmasaydi (mesela duvar sinir kosulu), o yönde Chebyshev polinomlarina geçmek gerekirdi --- bu da ``pseudo-spectral'' yöntem olurdu.
+
+
+% ============================================================
+\section{Bu Bölümün Özeti}
+
+\begin{enumerate}
+\item Fourier serisi: periyodik fonksiyonları sinüs/kosinüs toplamı olarak yazar.
+\item DFT: sürekli Fourier integralinin $N$-noktalı ayrık versiyonu.
+\item FFT: DFT'yi $O(N^2) \to O(N\log N)$'e düşürür (Cooley-Tukey).
+\item \textbf{Spectral türev}: Fourier uzayında $ik$ ile çarpmak $=$ fiziksel uzayda türev almak.
+\item \textbf{Spectral Laplacian}: $-|\vect{k}|^2$ ile çarpmak.
+\item \textbf{De-aliasing}: Nonlineer terimlerdeki sahte enerjiyi $2/3$ kuralıyla önle.
+\item \textbf{Poisson denklemi}: $\hat{p} = -\hat{f}/|\vect{k}|^2$ --- doğrudan, iterasyonsuz çözüm.
+\item \textbf{Projection}: Hız alanını divergence-free yapar (Helmholtz ayrışması).
+\end{enumerate}
+
+Bir sonraki bölümde, spectral yöntemlerle çözülen alanın fiziğini --- türbülans ve LES --- inceliyoruz.

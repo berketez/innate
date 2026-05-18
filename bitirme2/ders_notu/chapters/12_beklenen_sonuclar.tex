@@ -1,0 +1,250 @@
+\chapter{Beklenen Sonuçlar ve Tartışma}
+\label{ch:beklenen}
+
+Bu bölümde, INNATE modelinin farklı parametre rejimlerinde ne tür akış yapıları üretmesini beklediğimizi, hangi fiziksel büyüklükleri karşılaştıracağımızı ve başarı kriterlerini tartışıyoruz.
+
+
+%% ============================================================
+\section{Farklı Richardson Rejimlerinde Akış Yapıları}
+\label{sec:ri_regimes}
+
+Richardson sayısı $\Rich = \Ray/(\Rey^2 \Pran)$, kaldırma kuvveti ile atalet kuvvetinin oranını belirler. Bu oran, akışın karakterini kökten değiştirir.
+
+\subsection{$\Rich \ll 1$: Zorlanmış Konveksiyon Baskın}
+
+\textbf{Parametre örneği:} $\Rey = 10\,000$, $\Ray = 10^5$ $\Rightarrow$ $\Rich \approx 0.0014$.
+
+\begin{itemize}
+    \item Kolmogorov forcing baskın sürücüdür. Hız alanı $x$-yönünde güçlü shear gösterir.
+    \item Sıcaklık bir ``pasif skaler'' gibi davranır: akış tarafından taşınır ama akışı belirgin biçimde etkilemez.
+    \item Shear instability ve streak yapıları beklenir.
+    \item Sıcaklık izleçleri (iso-surface) yatay olarak uzamış, shear ile deforme olmuş görünür.
+    \item $\Nus$ düşüktür (konvektif ısı taşınımı zayıf).
+\end{itemize}
+
+\subsection{$\Rich \sim \mathcal{O}(1)$: Gerçek Mixed Konveksiyon}
+
+\textbf{Parametre örneği:} $\Rey = 5000$, $\Ray = 10^7$ $\Rightarrow$ $\Rich \approx 0.56$. Bu, projemizde ulaşılabilecek en yüksek $\Rich$ değeridir.
+
+\begin{itemize}
+    \item Kaldırma kuvveti ve forcing eş düzeyde etkilidir. Bu en karmaşık ve en ilginç rejimdir.
+    \item ``Tilted plumes'' oluşur: dikey yükselen sıcak plume'lar yatay rüzgâr tarafından eğilir.
+    \item Büyük ölçekli sirkülasyon hücreleri ile küçük ölçekli türbülans bir arada bulunur.
+    \item Hız alanında hem yatay (shear) hem dikey (buoyancy-driven) bileşenler görülür.
+    \item $\Nus$, saf doğal konveksiyon değerinden farklı olabilir --- yatay akış plume'ları bozarak ısı transferini artırabilir veya azaltabilir.
+\end{itemize}
+
+\subsection{$\Rich \gg 1$: Kaldırma Kuvveti Baskın}
+
+\textbf{Parametre örneği:} DNS validasyon aralığında, $\Rey = 1000$, $\Ray = 10^7$ ile $\Rich \approx 14.1$ elde edilebilir. INNATE eğitim aralığında ise ($\Rey \geq 5000$) bu rejim doğrudan ulaşılamaz.
+
+\begin{itemize}
+    \item Rayleigh--B\'{e}nard türü konveksiyon hücreleri baskın yapıdır.
+    \item Dikey plume'lar (mushroom-shaped) alttan yükselir, üstten düşer.
+    \item Yatay forcing zayıf bir perturbasyondur; plume'ları hafifçe eğer ama yok edemez.
+    \item $\Nus$ yüksektir, $\Ray$'a güçlü bağımlılık gösterir.
+    \item 3B etkiler belirgindir: plume'lar $z$-yönünde de genişler ve etkileşir.
+\end{itemize}
+
+\subsection{Beklenen Rejim Haritası}
+
+\begin{table}[H]
+\centering
+\caption{Parametre uzayındaki dört hedef rejim.}
+\label{tab:regimes}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Rejim} & $\Rey$ & $\Ray$ & $\Rich$ & \textbf{Baskın Mekanizma} \\
+\midrule
+Shear-dominant    & 10000 & $10^5$ & 0.0014 & Kolmogorov forcing \\
+Weak coupling     & 5000  & $10^6$ & 0.056  & Forcing $\gg$ buoyancy \\
+True mixed        & 5000  & $10^7$ & 0.56   & Forcing $\sim$ buoyancy \\
+Strong buoyancy   & 10000 & $10^7$ & 0.14   & Buoyancy etkisi belirgin \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+%% ============================================================
+\section{Nusselt Sayısı Davranışı}
+\label{sec:nusselt_beklenen}
+
+Nusselt sayısının farklı limit durumlarda bilinen davranışı:
+
+\subsection{Doğal Konveksiyon Limiti ($\Rich \gg 1$)}
+
+Türbülant Rayleigh--B\'{e}nard konveksiyonda klasik ölçeklenme:
+\begin{equation}
+    \Nus \sim C \, \Ray^{\beta}, \qquad \beta \approx \frac{1}{3} \quad \text{(türbülant rejim)}
+    \label{eq:nu_ra_scaling}
+\end{equation}
+$C$, sınır koşullarına ve $\Pran$'a bağlıdır. Periyodik kutuda kesin katsayı klasik değerlerden farklı olabilir, ancak üs ilişkisi korunmalıdır.
+
+\subsection{Zorlanmış Konveksiyon Limiti ($\Rich \ll 1$)}
+
+Sıcaklık pasif skalerken, ısı transferi Dittus--Boelter türü korelasyonla verilir:
+\begin{equation}
+    \Nus \sim \Rey^{1/2} \, \Pran^{1/3}
+    \label{eq:nu_forced}
+\end{equation}
+Ancak bu korelasyon boru akışı içindir; periyodik kutuda doğrudan geçerli değildir. Yine de $\Nus$'un $\Rey$ ile artan bir eğilim göstermesi beklenir.
+
+\subsection{Mixed Rejimde Birleşik Etki}
+
+Mixed rejimde her iki mekanizma da etkilidir. Asimptotik interpolasyon:
+\begin{equation}
+    \Nus_{\text{mixed}}^n \approx \Nus_{\text{forced}}^n + \Nus_{\text{natural}}^n
+    \label{eq:nu_mixed}
+\end{equation}
+Burada $n \approx 3$--$4$ (Churchill--Usagi korelasyonu). INNATE'in bu birleşik etkiyi ``öğrenip öğrenemeyeceği'' kritik bir soru. Model, $\Nus$ loss'u üzerinden termal bağlantıyı öğrenmeye zorlanır; ancak bu loss tek başına yeterli olmayabilir --- termal adveksiyon nöronlarının doğru çalışması da kritiktir.
+
+
+%% ============================================================
+\section{Enerji Spektrumu}
+\label{sec:spektrum_beklenen}
+
+\subsection{Kolmogorov $-5/3$ Yasası}
+
+Türbülant dengede, inertial subrange'de:
+\begin{equation}
+    E(k) = C_K \, \varepsilon^{2/3} \, k^{-5/3}
+    \label{eq:kolmogorov_spectrum}
+\end{equation}
+$C_K \approx 1.5$ (Kolmogorov sabiti). Bu yasa, evrensel türbülans teorisinin temelini oluşturur ve modelin türbülansı doğru temsil edip etmediğinin en güçlü testidir.
+
+\subsection{LES Cut-off Etkisi}
+
+INNATE'in kaba gridi ($96 \times 160 \times 64$) bir LES filtresine eşdeğerdir. Beklenen spektrum:
+\begin{itemize}
+    \item Düşük $k$'larda: $E(k) \sim k^{-5/3}$ (inertial range, DNS ile uyumlu).
+    \item Orta $k$'larda: Eğim hafifçe dikleşir (SGS modelinin etkisi).
+    \item Yüksek $k$'larda ($k > k_{\max}/2$): Hızlı düşüş --- çözünmeyen ölçekler.
+\end{itemize}
+
+\subsection{EddyViscosity3D'nin Spektruma Etkisi}
+
+Smagorinsky SGS modeli, yüksek dalga sayılarında enerjiyi \textit{fazladan} sönümler:
+\begin{equation}
+    \nu_t(k) = (C_s \Delta)^2 |S| \quad \Longrightarrow \quad \text{SGS dissipasyon} \propto k^2 \, \nu_t \, E(k)
+\end{equation}
+Bu, spektrumun kuyruğunda ``aşırı sönümleme'' yaratabilir. Öğrenilebilir $C_s$ parametresinin avantajı: model, eğitim sırasında $C_s$'yi fiziksel olarak uygun değere ayarlayabilir (tipik: $0.1 < C_s < 0.2$).
+
+\subsection{DNS vs INNATE Spektrum Karşılaştırması}
+
+$\Rey = 1000$--$3000$'de şu grafiğin üretilmesi beklenir:
+\begin{itemize}
+    \item DNS $E(k)$: tam çözünürlük, dissipative range dahil.
+    \item DNS (downsampled) $E(k)$: Fourier truncation sonrası, INNATE grid'inde.
+    \item INNATE $E(k)$: modelin ürettiği spektrum.
+\end{itemize}
+INNATE'in, downsampled DNS ile eşleşmesi idealdir; orijinal DNS'ten düşük dalga sayılarında sapma olmamalıdır.
+
+
+%% ============================================================
+\section{Boussinesq vs Non-Boussinesq Karşılaştırma}
+\label{sec:non_boussinesq}
+
+Proje, Faz~2'de (Non-Boussinesq) geçişi içermektedir. Aradaki farklar:
+
+\subsection{Parametre Karşılaştırması}
+
+\begin{table}[H]
+\centering
+\caption{Boussinesq vs Non-Boussinesq parametreleri.}
+\label{tab:bous_vs_nonbous}
+\begin{tabular}{lcc}
+\toprule
+ & \textbf{Boussinesq} & \textbf{Non-Boussinesq} \\
+\midrule
+$\Delta T$                & 20\,K     & 50\,K \\
+$\beta \cdot \Delta T$    & 0.067     & 0.167 \\
+Yoğunluk değişimi & \%6.7 & \%16.7 \\
+Simetri                   & Plume simetrik & Simetri bozuk \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Beklenen Fiziksel Farklar}
+
+Boussinesq yaklaşımında sıcak ve soğuk plume'lar simetriktir: sıcak fluid yükselirken, soğuk fluid aynı hızda alçalır. Gerçekte ise:
+
+\begin{enumerate}
+    \item \textbf{Asimetrik plume hızları:} Soğuk fluid daha yoğundur, dolayısıyla kaldırma kuvveti (hacim başına) daha büyüktür. Soğuk plume'lar sıcak plume'lardan daha hızlı hareket eder.
+
+    \item \textbf{Asimetrik ısı transferi:} Soğuk plume daha hızlı ve daha dar; sıcak plume daha yavaş ve daha geniş. Bu, üst ve alt yüzeylerdeki $\Nus$ değerlerinin farklılaşmasına yol açar.
+
+    \item \textbf{Viskozite değişimi:} Sıcak bölgede viskozite düşer (daha türbülant), soğuk bölgede artar (daha laminer). Bu etki $\Delta T = 50$\,K'de belirgin hale gelir.
+
+    \item \textbf{Ortalama sıcaklık kayması:} Simetri bozulduğunda ortalama sıcaklık profili artık $(T_h + T_c)/2 = 10$\degree C değil, hafifçe kayar.
+\end{enumerate}
+
+\subsection{INNATE'te Non-Boussinesq Nasıl Modelleniyor?}
+
+INNATE, Non-Boussinesq etkilerini şu mekanizmalarla yakalar:
+\begin{itemize}
+    \item Buoyancy3D nöronunda $\Rich$ parametresi, $\Delta T$'ye bağlı olarak ayarlanır.
+    \item Öğrenilebilir \texttt{buoyancy\_strength} parametresi, efektif bağlantı gücünü ayarlar.
+    \item Transfer learning: Boussinesq'te eğitilen model, Non-Boussinesq parametreleriyle fine-tune edilir.
+\end{itemize}
+
+$\beta \cdot \Delta T = 0.167$ değeri, Boussinesq'in geçerlilik sınırında (çoğu referans $\beta \Delta T < 0.1$ önerir). Bu, Boussinesq ve Non-Boussinesq arasındaki farkın ölçülebilir ama aşırı büyük olmamasını sağlar --- farkı göstermek için yeterli, modeli patlatmamak için makul.
+
+
+%% ============================================================
+\section{Başarı Kriterleri}
+\label{sec:basari}
+
+Projenin başarısını üç kademede değerlendiriyoruz.
+
+\subsection{Zorunlu Kriterler (Geç/Kal)}
+
+Bu kriterler sağlanmazsa proje başarısız sayılır:
+
+\begin{enumerate}
+    \item \textbf{NaN-free:} En az 1000 adım boyunca diverge etmemeli.
+    \item \textbf{Divergence:} $\| \divergence \vect{u} \|_\infty < 10^{-5}$.
+    \item \textbf{Spektrum:} $E(k) \sim k^{-\alpha}$, $|\alpha - 5/3| < 0.5$.
+    \item \textbf{Nusselt:} $\Nus > 1$.
+    \item \textbf{DNS doğruluğu:} $\Rey = 1000$'de $\epsilon_E < 0.15$.
+\end{enumerate}
+
+\subsection{Hedef Kriterler (Başarılı)}
+
+\begin{enumerate}
+    \item Dört rejim modellendi ($\Rich \ll 1$, $\Rich \sim 0.1$, $\Rich \sim 1$, $\Rich \gg 1$).
+    \item Non-Boussinesq simülasyon yapıldı ve Boussinesq'ten fark gösterildi.
+    \item DNS doğruluğu: $\epsilon_E < 0.15$ ($\Rey = 1000$--$3000$ aralığında).
+    \item 3D görselleştirme (VTK/ParaView) üretildi.
+\end{enumerate}
+
+\subsection{İdeal Kriterler (Mükemmel)}
+
+\begin{enumerate}
+    \item DNS doğruluğu: $\epsilon_E < 0.10$ (\%10 hata).
+    \item FNO (Fourier Neural Operator) ile karşılaştırma yapıldı.
+    \item 3B animasyon üretildi (plume evrimi, vorticity izosurface).
+    \item $\Nus(\Ray)$ ölçeklenme yasası doğrulandı.
+\end{enumerate}
+
+
+%% ============================================================
+\section{Potansiyel Katkılar}
+\label{sec:katkilar}
+
+Bu projenin literatüre potansiyel katkıları:
+
+\begin{enumerate}
+    \item \textbf{3D mixed convection + neural operator:} Literatürde 2D PINN/FNO çalışmaları var, ancak 3D mixed convection'ı neural operator ile modelleyen çalışma neredeyse yoktur.
+
+    \item \textbf{Physics-only training:} INNATE, DNS verisi olmadan, yalnızca fizik denklemlerinden eğitilir. Bu, veriye bağımlılığı ortadan kaldırır --- pratik uygulamalarda büyük avantaj.
+
+    \item \textbf{Yorumlanabilirlik:} FNO ve DeepONet ``kara kutu''dur; içsel parametrelerin fiziksel anlamı yoktur. INNATE'te her parametre fiziksel bir büyüklüğe karşılık gelir ($\nu_{\text{eff}}$, $C_s$, buoyancy strength vb.). Bu, modelin ``ne öğrendiğini'' inceleme olanağı sunar.
+
+    \item \textbf{MLP-free mimari:} INNATE'in yeni mimarisi (bölüm~\ref{ch:innate_mimari}) hiçbir MLP katmanı içermez --- tüm hesaplama fizik nöronlarıyla yapılır. Bu, neural operator literatüründe benzersiz bir yaklaşımdır.
+
+    \item \textbf{Yayınlanabilir potansiyel:} Yukarıdaki katkılar, ``hedef'' ve ``ideal'' kriterler sağlandığında, konferans bildirisi (ICML Workshop, NeurIPS AI4Science) veya dergi makalesi (Journal of Computational Physics, Physics of Fluids) seviyesinde bir yayın potansiyeli taşır.
+\end{enumerate}
+
+\begin{remark}
+Dürüst bir değerlendirme: ``ideal'' kriterlerin tamamının sağlanması iddialıdır. Ancak ``hedef'' kriterlerin sağlanması realistiktir ve tek başına anlamlı bir bitirme projesi oluşturur. Önemli olan, modelin fiziksel olarak tutarlı 3D türbülant akış üretebilmesidir --- bu bile, mevcut literatür göz önüne alındığında kayda değer bir başarıdır.
+\end{remark}

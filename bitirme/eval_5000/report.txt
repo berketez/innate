@@ -1,0 +1,29 @@
+============================================================
+INNATE3D TGV Evaluation Report
+============================================================
+
+Model Configuration:
+   
+  T_final: 0.8
+  dt: 0.002
+
+Physical Metrics:
+  Initial Energy: 0.125000
+  Final Energy: 0.124391
+  Energy Decay: 0.49%
+
+  Peak Enstrophy: 0.391797
+  Peak Time: 0.800
+
+Numerical Quality:
+  Mean Divergence: 3.93e-04
+  Max Divergence: 8.06e-03
+  Mean |Helicity|: 1.41e-10
+
+DNS Comparison:
+  Energy L2 Error: 0.0000
+  Energy Max Error: 0.0000
+  Enstrophy L2 Error: 0.0149
+  Enstrophy Max Error: 0.0193
+
+============================================================
