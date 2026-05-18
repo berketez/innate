@@ -36,7 +36,46 @@ python evaluate.py --ckpt results_v2/checkpoints/checkpoint_epoch000099.pt
 
 ---
 
-## Probleme Bir Bakış
+## Bitirme 1 — 3B Taylor–Green Girdabı (TGV3D) + PINN
+
+İlk dönem çalışması, türbülanslı akış modellemesinin makine öğrenmesi ile yapılması için klasik bir kıyas problemi olan **Taylor–Green Girdabı**'nı ele aldı. TGV3D, periyodik küp içinde tanımlı, başlangıçta basit analitik bir konfigürasyondan başlayan ve hızla 3B türbülansa geçen bir test problemidir; analitik kapalı-form çözüm sadece t = 0'da vardır, dolayısıyla doğrulama doğrudan DNS referansları ve fiziksel büyüklüklerin izlenmesi ile yapılır.
+
+### Yöntem
+- **Problem:** 3B sıkıştırılamaz Navier–Stokes denklemleri, [0, 2π]³ periyodik küp, Re ≈ 1000, t ∈ [0, 0.8]
+- **Yaklaşım:** Fizik Bilgili Sinir Ağları (PINN) — diferansiyel denklemlerin fiziksel kısıtlarını doğrudan kayıp fonksiyonuna entegre eden bir paradigma
+- **Mimari:** Farklı aktivasyon fonksiyonlu dört dalın **softmax süperpozisyonu** ile birleştirildiği çok dallı (multi-branch) PINN — yaklaşık 4 × 10⁵ parametre
+- **Tek ağdan dört çıkış:** (u, v, w, p) aynı ağ üzerinden eş zamanlı kestirim
+
+### Anahtar Yenilikler
+- **Sert (hard) başlangıç koşulu ansatzı:** t = 0 başlangıç koşulu **yapısal olarak** ağa gömülür, "sıfır çözüme" çökme önlenir
+- **Müfredat öğrenmesi:** Fiziksel kısıtlar (süreklilik, momentum, enerji dengesi, vortisite taşınımı, helisite, simetri) **kademeli** olarak devreye alınır
+- **FP32 türevler:** İkinci mertebe türevlerin sayısal kararlılığı için karma hassasiyet yerine FP32
+- **Sobol tabanlı örnekleme + zaman yanlılığı:** t ≈ 0 bölgesine ağırlıklı örnekleme
+
+### Sonuçlar (TGV3D, t = 0.8)
+
+| Metrik | PINN | INNATE (ilk prototip) | Açıklama |
+|---|---|---|---|
+| u L² hatası | ~%11.3 | **~%0.31** | INNATE 36× daha iyi |
+| v L² hatası | ~%14.1 | **~%0.11** | INNATE 128× daha iyi |
+| w göreli hatası | ~%77.8 | **~%0.76** | w₀ = 0 nedeniyle PINN yanıltıcı; INNATE yine de yüksek doğrulukta |
+| Diverjans | ~10⁻³ | **3.9 × 10⁻⁴** | INNATE'in yapısal projeksiyonu sayesinde |
+| Enerji hata (ort.) | ~%5 | — | t = 0.8'de %7.7 maksimum |
+| Parametre sayısı | ~400 K | ~10 K | INNATE 40× daha küçük |
+| Eğitim süresi | ~60 saat (RTX 4090) | — | 5000 epoch ön sonuç |
+
+### INNATE'in Doğuşu
+
+Bitirme 1, PINN paradigmasının üç boyutlu türbülans problemlerinde gözlemlenen **yapısal sınırlarına** çözüm olarak **INNATE (Intrinsic Navier–Stokes Neural Architecture for Temporal Evolution)** yaklaşımını ilk kez kavramsal olarak ortaya koydu:
+
+> *"Physics as structure, not penalty."*
+> Fiziksel operatörler kayıp fonksiyonuna eklenmiş cezalar olarak değil, doğrudan ağı oluşturan nöronlar olarak tanımlanır.
+
+İlk prototip — adveksiyon, difüzyon, projeksiyon, vortisite, helisite nöronları + PhysicsModulator MLP — TGV3D'de PINN'e kıyasla iki büyüklük mertebesi düşük L² hatası üretti. Bu kavramsal kanıt, **Bitirme 2'de** çok daha zorlu bir problemde (karışık konveksiyon, Re = 10 000, ısı transferi içeren) gerçek anlamda test edildi ve **MLP modülü tamamen kaldırılıp saf-fizik bir mimariye** dönüştürüldü.
+
+---
+
+## Probleme Bir Bakış (Bitirme 2)
 
 - **Akış:** Boussinesq yaklaşımı altında 3B sıkıştırılamaz Navier–Stokes + enerji denklemi
 - **Geometri:** Lx × Ly × Lz = 6 × 10 × 4 (dikey y), periyodik küp benzeri, 96 × 160 × 64 ızgara
